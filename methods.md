@@ -32,29 +32,35 @@ $$F(\mathbf{s}, \lambda) = -\frac{1}{\beta} \ln \int d\mathbf{u}\, e^{-\beta U(\
 
 The first two terms are the energy of the ground state $\mathbf{u}^* = C \mathbf{h}$, and the last term is the free energy of thermal fluctuations about it. We use $\beta = 1$.
 
+The network can also unfold. We treat folding as an equilibrium between two states: the folded network in solvent, with free energy $F(\mathbf{s}, \lambda_0)$, and an unfolded state whose free energy $F_{\mathrm{u}}$ is the same for every sequence. The fraction of time a sequence spends folded is then
+
+$$p_{\mathrm{fold}}(\mathbf{s}) = \frac{1}{1 + e^{\beta \left(F(\mathbf{s}, \lambda_0) - F_{\mathrm{u}}\right)}}, \tag{5}$$
+
+close to 1 for sequences whose free energy is well below $F_{\mathrm{u}}$ and close to 0 for those well above it. $F_{\mathrm{u}}$ is a physical parameter of the model; $F_{\mathrm{u}} = \infty$ means that no sequence unfolds.
+
 ## Binding free energies
 
 The binding free energy is the difference in free energy between ligand-bound and solvent-bound conditions,
 
-$$\Delta F_k(\mathbf{s}) = F(\mathbf{s}, \lambda_k) - F(\mathbf{s}, \lambda_0), \qquad k = 1, 2. \tag{5}$$
+$$\Delta F_k(\mathbf{s}) = F(\mathbf{s}, \lambda_k) - F(\mathbf{s}, \lambda_0), \qquad k = 1, 2. \tag{6}$$
 
 Because the ligand changes $\mathbf{h}$ and $c$ but not $H$ or the sequence, the fluctuation term and the contact energies cancel, and Eq. (4) gives
 
-$$\Delta F_k(\mathbf{s}) = \tfrac{1}{2} \kappa \left(1 - \kappa \chi\right) \lambda_k^2 - \kappa \lambda_k e_0, \qquad e_0 = \mathbf{b}^\top C\, \mathbf{h}(\mathbf{s}, \lambda_0), \quad \chi = \mathbf{b}^\top C\, \mathbf{b}. \tag{6}$$
+$$\Delta F_k(\mathbf{s}) = \tfrac{1}{2} \kappa \left(1 - \kappa \chi\right) \lambda_k^2 - \kappa \lambda_k e_0, \qquad e_0 = \mathbf{b}^\top C\, \mathbf{h}(\mathbf{s}, \lambda_0), \quad \chi = \mathbf{b}^\top C\, \mathbf{b}. \tag{7}$$
 
 The binding energies $\Delta F_1$ and $\Delta F_2$ depend only on the sequence, yielding two sequence-to-function maps that can be used to evolve a population. The sequence enters them through two properties of the active site in the solvent-bound state: its pre-strain $e_0$, the extension of the active site in the ground state, and its compliance $\chi$. A pre-strain toward opening ($e_0 > 0$) favors ligand 1 at the expense of ligand 2. Since $\kappa \chi < 1$, $\Delta F_1 + \Delta F_2 = \kappa (1 - \kappa \chi)\, \delta^2 > 0$, so no sequence binds both ligands and tighter binding of one comes at the expense of the other. Sequences that strike an optimal balance between the two, by maximizing the weaker of the two affinities $G = \min(-\Delta F_1, -\Delta F_2)$, define generalists.
 
 ## Selection
 
-Selection rewards tighter binding with increased probability of reproduction. With $\Delta F^n_k$ denoting the binding energy to ligand $k \in \{1, 2\}$ of the $n$th individual, the population at generation $t + 1$ is obtained by sampling $P$ individuals at generation $t$ according to a multinomial distribution with probabilities
+Selection rewards tighter binding, and folding, with increased probability of reproduction. With $\Delta F^n_k$ denoting the binding energy to ligand $k \in \{1, 2\}$ of the $n$th individual and $p^n_{\mathrm{fold}}$ its folded fraction, Eq. (5), the population at generation $t + 1$ is obtained by sampling $P$ individuals at generation $t$ according to a multinomial distribution with probabilities
 
-$$p^n_t = \frac{e^{-a \Delta F^n_{k(t)} / \Delta F_0}}{\sum_{n'=1}^{P} e^{-a \Delta F^{n'}_{k(t)} / \Delta F_0}}, \qquad k(t) = 1 + \left[\left(\left\lfloor \frac{t - 1}{\tau} \right\rfloor + k_0 - 1\right) \bmod 2\right]. \tag{7}$$
+$$p^n_t = \frac{p^n_{\mathrm{fold}}\, e^{-a \Delta F^n_{k(t)} / \Delta F_0}}{\sum_{n'=1}^{P} p^{n'}_{\mathrm{fold}}\, e^{-a \Delta F^{n'}_{k(t)} / \Delta F_0}}, \qquad k(t) = 1 + \left[\left(\left\lfloor \frac{t - 1}{\tau} \right\rfloor + k_0 - 1\right) \bmod 2\right]. \tag{8}$$
 
-The switching selective pressure is implemented by $k(t)$, which alternates between $k = 1$ and $k = 2$ every $\tau$ generations, starting from an environment $k_0$ drawn uniformly for each replicate. $\Delta F_0$ is the scale of the binding energies. Unlike in a model with bounded energies, it has no simple closed form here, so we take it as the spread of the binding energies of $10^3$ uniformly random sequences: the standard deviation of the distance of the points $(\Delta F_1, \Delta F_2)$ from their centroid. The parameter $a > 0$ defines the selective pressure, and we use $a = 1$.
+A sequence that does not fold is therefore strongly selected against, whatever its binding energy. The switching selective pressure is implemented by $k(t)$, which alternates between $k = 1$ and $k = 2$ every $\tau$ generations, starting from an environment $k_0$ drawn uniformly for each replicate. Under static selection, $k(t) = k$ is held fixed. $\Delta F_0$ is the scale of the binding energies. Unlike in a model with bounded energies, it has no simple closed form here, so we take it as the spread of the binding energies of $10^3$ uniformly random sequences: the standard deviation of the distance of the points $(\Delta F_1, \Delta F_2)$ from their centroid. The parameter $a > 0$ defines the selective pressure, and we use $a = 1$.
 
 ## Evolutionary dynamics
 
-We simulated the evolution of a population of fixed size $P = 100$ using Wright–Fisher dynamics, with selection switching between acting on $\Delta F_1$ and $\Delta F_2$ every $\tau$ generations. Populations were initialized with independent, uniformly random sequences. Each generation consists of selection, Eq. (7), followed by mutation: each amino acid mutates with probability $\mu$ to one of the other $q - 1$ types, chosen uniformly. We used $\mu = 3 \times 10^{-3}$ (about 0.35 mutations per sequence per generation) and $\tau = 1, 2, 4, \dots, 256$, and ran each trajectory for $N_g = 2048$ generations. For each $\tau$, 100 replicate populations are evolved on the same network and interaction tables, and 50 sequences are sampled from each: one random individual at each of 50 random generations in the last half of the trajectory, within a window that spans a whole number of environmental periods.
+We simulated the evolution of a population of fixed size $P = 100$ using Wright–Fisher dynamics, with selection switching between acting on $\Delta F_1$ and $\Delta F_2$ every $\tau$ generations. Populations were initialized with independent, uniformly random sequences. Each generation consists of selection, Eq. (8), followed by mutation: each amino acid mutates with probability $\mu$ to one of the other $q - 1$ types, chosen uniformly. We used $\mu = 3 \times 10^{-3}$ (about 0.35 mutations per sequence per generation) and $\tau = 1, 2, 4, \dots, 256$, and ran each trajectory for $N_g = 2048$ generations. For each $\tau$, 100 replicate populations are evolved on the same network and interaction tables, and 50 sequences are sampled from each: one random individual at each of 50 random generations in the last half of the trajectory, within a window that spans a whole number of environmental periods.
 
 ## Parameters
 
@@ -68,6 +74,7 @@ We simulated the evolution of a population of fixed size $P = 100$ using Wright�
 | $\kappa$ | ligand spring stiffness | 1 |
 | $\lambda_0, \lambda_1, \lambda_2$ | solvent and ligand rest-length offsets | $0, 0.2, -0.2$ |
 | $\beta$ | inverse temperature | 1 |
+| $F_{\mathrm{u}}$ | free energy of the unfolded state | $\infty$ (no unfolding) |
 | $P$ | population size | 100 |
 | $\mu$ | mutation rate per site per generation | $3 \times 10^{-3}$ |
 | $a$ | selective pressure | 1 |
