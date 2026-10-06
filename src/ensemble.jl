@@ -29,7 +29,7 @@ function evolvePopEns(seeds::Vector{UInt},
                       μ::Number, # mutation rate
                       τ::Int, # enviromental timescale
                       selParams::Tuple;
-                      N_seqs2Keep::Int=length(nets))
+                      N_seqs2Keep::Int=P)
     
     # evolve many replicate populations.
     N_reps = length(seeds)

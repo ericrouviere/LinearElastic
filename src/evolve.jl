@@ -113,7 +113,7 @@ function evolvePop(P::Integer, # population size
                    seed::UInt; # set the seed
                    k_init::Int=1, # Initial enviroment
                    sampleLastHalf::Bool=true, # if true sample last half, if false return final
-                   N_seqs2Keep::Int=length(nets)) 
+                   N_seqs2Keep::Int=P) 
     # generate population of networks and evolve it.
     Random.seed!(seed)
     nets = [buildRandNetwork(tables) for i in 1:P]
@@ -131,7 +131,7 @@ function evolvePop_seqsOnly(P::Integer, # population size
                    seed::UInt; # set the seed
                    k_init::Int=1, # Initial enviroment
                    sampleLastHalf::Bool=true, # if true sample last half, if false return final
-                   N_seqs2Keep::Int=length(nets)) 
+                   N_seqs2Keep::Int=P) 
     # generate population of networks and evolve it
     # return only a vector or sequences
     Random.seed!(seed)
