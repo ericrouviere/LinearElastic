@@ -38,7 +38,7 @@ earlier "v15" model. Plotting uses PyPlot (matplotlib) and data uses JLD2. Julia
 
 ### Directory layout
 - `src/` holds the module. `LinearElastic.jl` includes the files and lists the exports. `old.jl` and `potts.jl` are **not**
-  included (dead code).
+  included (fully commented-out dead code).
 - `exps/NNN/`: one directory per experiment. Each one has three parts:
   - `scripts/make_settings.jl` builds a settings `Dict S` (including the `Tables` and `Ligands` objects) and **wipes and
     recreates** `../ens/`. It writes `ens/MMM/scripts/settings.jld2` for each value of a swept parameter (`the_list_1`,
@@ -66,14 +66,32 @@ earlier "v15" model. Plotting uses PyPlot (matplotlib) and data uses JLD2. Julia
   `notes.ipynb` has the cross-experiment analysis (it hard-codes absolute Dropbox paths).
 - `Rigidpy/`: a clone of github.com/VardaHagh/Rigidpy with its own `.git`. It is git-ignored and used only by the unit-test notebook.
 
-### Gotchas / known issues (not yet fixed; confirm with user before changing)
-- `updateNetParams!` writes `lpdH = lpdH` (a local no-op), so `net.lpdH` is **not** refreshed. Binding energies are
-  differences in which `lpdH` cancels, so they are unaffected. Absolute free energies after `updateNetParams!` are stale.
-- In `make_settings.jl`, `ΔF, s, m = computeBindingRandSeqs(...)` but the function returns `(ΔF, mean, std)`. So `s` is
-  actually the mean of the centroid, and `selParams = (1/s, 1)` uses that rather than the std of the random-sequence cloud.
+### Git
+- Only `src/`, `Project.toml`, `Manifest.toml`, `README`, `CLAUDE.md` and `.gitignore` are tracked. `exps/`, `notebooks/` and
+  `Rigidpy/` are git-ignored, so edits there cannot be committed. (They exist in the first commit, `1e0615b`.)
+- The environment is resolved for Julia 1.12 (`julia --project=.`). The newer JLD2 still loads the old experiment `.jld2` files.
+
+### Unused code
+- Code in `src/` that isn't reachable from `exps/*/scripts/*.jl`, `notebooks/**/*.ipynb` or `exps/*/analysis/*.ipynb` is
+  commented out (not deleted) and marked `# UNUSED`. The matching exports are commented out too. Uncomment it if needed.
+- `old.jl` and `potts.jl` are fully commented out and not included in the module.
+- `computeHessian`, `computePerturbedNetParams_old`, `pdetdiagm` and the matrix method of `logpdet` are used only by
+  `notebooks/unit_tests/unit_tests.ipynb`.
+
+### Bugs fixed (Oct 2026) and their effect on existing data
+- `updateNetParams!` now sets `net.lpdH`. It used to be a local no-op. Binding energies were never affected because
+  `lpdH` cancels in them.
+- `computeBindingRandSeqs` now returns `(ΔF, std, mean)`, which is the order every caller unpacks (`ΔF, s, m`). Before the fix,
+  experiments 001–010 scaled selection by the **mean** of the random-sequence binding cloud, not its std. Their stored
+  `S["selParams"]` and `S["stdBindRandSeqs"]` (which actually hold the mean) record what was really used. Analysis notebooks
+  that recompute `s` with `computeBindingRandSeqs` now get the true std, which won't match the stored selection scale.
+- The `N_seqs2Keep` default in `evolvePop`, `evolvePop_seqsOnly` and `evolvePopEns` was `length(nets)` (undefined). It is now `P`.
+- `evolvePop` and `evolvePop_seqsOnly` now pass `sampleLastHalf` through to `evolvePop!`.
+
+### Gotchas / open questions
 - `evolvePopEns` builds `k_init_vec` from two `ones(...)` blocks, so every replicate starts in environment 1. Alternating
-  starts may have been intended.
-- The kwarg default `N_seqs2Keep=length(nets)` in `evolvePop`/`evolvePopEns` references an undefined variable. Always pass it.
+  starts (`[ones; 2 .* ones]`) may have been intended. This is unconfirmed, so it is left unchanged.
+- The `"Binding"` and `"Cooperativity"` assays in `computeFitness` expect exactly 2 and 4 ligand states. `"Generalist"` expects 3.
 - `settings.jld2` stores `Tables`/`Ligands`/`Perturbation` structs. Changing those type definitions breaks loading old
   experiment settings with JLD2.
 - `make_settings.jl` draws random `Tables` without a seed. The saved `settings.jld2` is the only record of an experiment's tables.
