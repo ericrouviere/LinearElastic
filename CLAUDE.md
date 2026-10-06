@@ -152,6 +152,14 @@ Outputs land in `ens/<NNNN>/data/`: `populations`, `dms`, `binding_energies`, pl
 seeds, `k_init_vec`) and `run_meta` (Julia version, worker count, git commit, timestamp). To reproduce a run, load
 `seeds.jld2` and call `evolvePopEnsemble(ligands, tables, β, evo, seeds; k_init_vec, N_seqs2Keep)`.
 
+**Analysis**: `exps/NNN/analysis/make_figs.jl` is a headless script version of the analysis notebook (011 has one, ported
+from 010's `analysis_before_after.ipynb`). Run it from that directory with `julia make_figs.jl > make_figs.log 2>&1`
+(`N_WORKERS` env var, default 8). It activates the project via `@__DIR__`, reads τ/μ and the tables from the ens
+settings instead of hard-coding them, fails fast if any run output is missing, seeds its random-sequence baseline,
+writes every figure as `.svg` and `.pdf`, and prints a summary table. Gotchas: paths given to `pmap` must be absolute
+(`cd` only moves the main process, not the workers), and with `text.usetex` on in matplotlibrc, labels must not contain
+literal unicode or a bare `|` (use math mode, e.g. `L"Stress $|h|$"`).
+
 The cluster is UChicago **midway** (account `pi-ranganathanr`, partition `caslake`, remote path
 `/home/rouviere/LinearElastic`); `exps/download_data_midway.sh` scp's `ens/` back. `exps/README` is the experiment log:
 - All use W=L=11, β=1, mismatchVar=0.1.
