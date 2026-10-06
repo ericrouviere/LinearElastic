@@ -16,7 +16,7 @@ const β = 1.0
 
 function testTables(; seed=1)
     Random.seed!(seed)
-    return makeTables(7, 7, 0.15, 5, 1e-2, 1e1, 0.0, 0.1)
+    return makeTables(7, 7, 0.15, 5, 1e-2, 1e1, 0.5, 0.1) # nonzero contact energies
 end
 
 function testLigands(tables)
@@ -30,7 +30,7 @@ end
 """
 Free energy of `seq` perturbed by `per`, built from scratch: the stiffness and
 mismatch of each perturbed bond are changed in the diagonal bond matrices
-before forming H = T'ΓT, h = T'ΓM·1 and c = ½·1'ΓM²1.
+before forming H = T'ΓT, h = T'ΓM·1 and c = ½·1'ΓM²1 + Σ ε (contact energies).
 """
 function directFreeEnergy(seq, per::Perturbation, tables)
     R, A, K, D = tables.R, tables.A, tables.K, tables.D
@@ -51,13 +51,22 @@ function directFreeEnergy(seq, per::Perturbation, tables)
     end
     H = T' * Diagonal(k) * T
     h = T' * (k .* d)
-    c = sum(k .* d .^ 2) / 2
+    c = sum(k .* d .^ 2) / 2 + contactEnergy(seq, tables)
     G = pinv(H)
     vals = eigvals(Symmetric(H))
     lpdH = sum(log, vals[4:end]) # 3 zero modes in 2D
     N_dims = length(h)
     return -dot(h, G, h) / 2 + c - (N_dims * log(2pi / β) - lpdH) / (2β)
 end
+
+"Sum of the contact energies `E[s_i, s_j]` over the bonds of the network."
+function contactEnergy(seq, tables)
+    A, E = tables.A, tables.E
+    return sum(E[seq[i], seq[j]] for j in 1:size(A, 1)-1 for i in j+1:size(A, 1) if A[i, j] == 1)
+end
+
+"Copy of `tables` with the contact-energy table replaced by `E`."
+withContactEnergies(tables, E) = Tables(tables.R, tables.A, tables.K, tables.D, E)
 
 @testset "LinearElastic physics" begin
 
@@ -117,6 +126,43 @@ end
             ΔF = computeBindingEnergies(buildNetwork(seq, tables), ligands, tables, β)
             @test dms[t, j, :] ≈ ΔF .- ΔF_wt atol=1e-9
         end
+    end
+
+    @testset "contact energies: any symmetric table E" begin
+        tables = testTables()
+        ligands = testLigands(tables)
+        q = size(tables.K, 1)
+        E = [Float64(a * b) - 3.0 * (a == b) for a in 1:q, b in 1:q] # chosen, not random
+        tablesE = withContactEnergies(tables, E)
+        tables0 = withContactEnergies(tables, zeros(q, q))
+        net = buildRandNetwork(tablesE)
+        seq = copy(net.seq)
+
+        # the energy constant c includes the contact energy of every bond
+        _, _, c = seq2NetParams(seq, tablesE)
+        _, _, c0 = seq2NetParams(seq, tables0)
+        @test c ≈ c0 + contactEnergy(seq, tablesE)
+        # so the free energy shifts by exactly the contact energy
+        @test computeFreeEnergy(buildNetwork(seq, tablesE), β) ≈
+              computeFreeEnergy(buildNetwork(seq, tables0), β) + contactEnergy(seq, tablesE)
+
+        # mutations update the contact energy incrementally
+        Random.seed!(5)
+        for _ in 1:30
+            mutateBead!(net, tablesE)
+        end
+        @test net.c ≈ getNetParams(net.seq, tablesE)[4] rtol=1e-10
+
+        # binding does not change the sequence, so contact energies cancel in ΔF
+        @test computeBindingEnergies(buildNetwork(seq, tablesE), ligands, tablesE, β) ≈
+              computeBindingEnergies(buildNetwork(seq, tables0), ligands, tables0, β)
+        @test computeBindingDMS(buildNetwork(seq, tablesE), ligands, tablesE, β) ≈
+              computeBindingDMS(buildNetwork(seq, tables0), ligands, tables0, β)
+
+        # a non-symmetric table would make the full build and the mutation update disagree
+        Easym = copy(E); Easym[1, 2] += 1
+        @test_throws ArgumentError buildNetwork(seq, withContactEnergies(tables, Easym))
+        @test_throws ArgumentError buildNetwork(seq, withContactEnergies(tables, zeros(q, q + 1)))
     end
 
     @testset "computeBindingRandSeqs returns (ΔF, std, mean)" begin

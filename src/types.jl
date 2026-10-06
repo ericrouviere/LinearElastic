@@ -1,8 +1,9 @@
 
 """
 Quantities that are fixed over evolution: bead positions `R = [x1, y1, x2, y2, ...]`,
-adjacency matrix `A`, and the bead-type tables `K` (bond stiffness), `D` (bond
-rest-length mismatch) and `E` (contact energy, unused).
+adjacency matrix `A`, and the symmetric bead-type tables `K` (bond stiffness), `D`
+(bond rest-length mismatch) and `E` (bond contact energy): a bond between beads of
+types `a` and `b` has stiffness `K[a, b]`, mismatch `D[a, b]` and contact energy `E[a, b]`.
 """
 struct Tables
     R::Vector{Float64}

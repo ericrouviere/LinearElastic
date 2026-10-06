@@ -84,8 +84,9 @@ function buildSpringTable(N_types::Int, k_min::Number, k_max::Number; binary=fal
 end
 
 """
-Symmetric table of contact energies between bead types, Gaussian with standard
-deviation `energyVar` (not used by the energy model).
+Symmetric table `E[a, b]` of the contact energy of a bond between beads of types `a`
+and `b`, Gaussian with standard deviation `energyVar`. Each bond adds its contact
+energy to the network's energy, independent of the displacement.
 """
 function buildContactEnergyTable(N_types::Int, energyVar::Number)
     return Float64.(Symmetric( energyVar*randn(N_types, N_types) ))
@@ -107,6 +108,10 @@ Build the `Tables` of an experiment: a perturbed `W × L` triangular lattice
 (`buildStructure`) and random bead-type tables of stiffness (`buildSpringTable`),
 mismatch (`buildMismatchTable`) and contact energy (`buildContactEnergyTable`).
 Draws from the global RNG; seed it first for a reproducible network.
+
+To use chosen values for a table instead, build the struct directly, e.g.
+`Tables(t.R, t.A, t.K, t.D, E)` for a symmetric `N_types × N_types` contact-energy
+matrix `E`.
 """
 function makeTables(W::Int,
                    L::Int,

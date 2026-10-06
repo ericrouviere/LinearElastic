@@ -9,7 +9,8 @@ end
 
 """
 Mutate bead `mutatedBead` of `net` to type `newType` and update the cached energy
-parameters by a low-rank update over the bead's bonds (`computePerturbedNetParams!`).
+parameters by a low-rank update over the bead's bonds (`computePerturbedNetParams!`),
+plus the change in the contact energy of those bonds.
 """
 function mutateBead!(net::Network, tables::Tables, mutatedBead::Int, newType::Integer)
     A, R, K, D, E= tables.A, tables.R, tables.K, tables.D, tables.E
@@ -21,10 +22,12 @@ function mutateBead!(net::Network, tables::Tables, mutatedBead::Int, newType::In
     N_m = length(connectedBeads)
     Δk = zeros(N_m)
     Δd = zeros(N_m)
+    ΔE = 0.0 # change in the contact energy of the mutated bead's bonds
     for (i, bead_i) in enumerate(connectedBeads)
         beadType_i = net.seq[bead_i]
         Δk[i] = K[newType, beadType_i] - K[oldType, beadType_i]
         Δd[i] = D[newType, beadType_i] - D[oldType, beadType_i]
+        ΔE += E[newType, beadType_i] - E[oldType, beadType_i]
     end
     mutation = Perturbation(bonds, Δk, Δd)
     computePerturbedNetParams!(net, mutation, tables)
@@ -32,7 +35,7 @@ function mutateBead!(net::Network, tables::Tables, mutatedBead::Int, newType::In
     net.G .+= net.δG
     net.h .+= net.δh
     net.lpdH += net.δlpdH
-    net.c += net.δc
+    net.c += net.δc + ΔE
     return nothing
 end
 

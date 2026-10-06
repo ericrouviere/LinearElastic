@@ -183,35 +183,56 @@ end
     seq2NetParams(seq, tables)
 
 Parameters `H, h, c` of the quadratic energy `U(r) = ½ r'Hr - h'r + c` of sequence
-`seq`, the sum over bonds of `½ k_l (e_l - d_l)²` with `e_l` the elongation of bond
-`l`. Bond `l` between beads `i` and `j` has stiffness `k_l = K[seq[i], seq[j]]` and
-mismatch `d_l = D[seq[i], seq[j]]`; with `Γ = diag(k)`, `M = diag(d)` and the
-beads-to-bonds matrix `T`:
+`seq`, the sum over bonds of `½ k_l (e_l - d_l)² + ε_l` with `e_l` the elongation of
+bond `l`. Bond `l` between beads `i` and `j` has stiffness `k_l = K[seq[i], seq[j]]`,
+mismatch `d_l = D[seq[i], seq[j]]` and contact energy `ε_l = E[seq[i], seq[j]]`; with
+`Γ = diag(k)`, `M = diag(d)` and the beads-to-bonds matrix `T`:
 
-    H = T'ΓT,   h = T'ΓM·1,   c = ½·1'ΓM²1.
+    H = T'ΓT,   h = T'ΓM·1,   c = ½·1'ΓM²1 + Σ_l ε_l.
+
+The tables must be symmetric (`checkTables`).
 """
 function seq2NetParams(seq, tables::Tables)
+    checkTables(tables)
     R, A, K, D, E = tables.R, tables.A, tables.K, tables.D, tables.E
     N_beads = size(A,1)
     N_bonds = Int(sum(A)/2)
     T = makeBeads2BondsMatrix(A, R)
     Γ = Diagonal(zeros(N_bonds)) # diagonal Stiffness matrix
     M = Diagonal(zeros(N_bonds))
-   # C = zeros(N_bonds, N_bonds)
+    contactEnergy = 0.0 # sum of the contact energies of all bonds
     l = 0
     @inbounds for j in 1:N_beads-1, i in j+1:N_beads
         if A[i,j] == 1
             l += 1
             Γ[l,l] = K[seq[i], seq[j]]
             M[l,l] = D[seq[i], seq[j]]
-            #C[l,l] = E[seq[i], seq[j]]
+            contactEnergy += E[seq[i], seq[j]]
         end
     end
     ones_vec = ones(N_bonds)
     H = T'Γ*T
     h = T'*(Γ*M)*ones_vec
-    c = 0.5*ones_vec'*(Γ*M*M)*ones_vec
+    c = 0.5*ones_vec'*(Γ*M*M)*ones_vec + contactEnergy
     return H, h, c
+end
+
+"""
+    checkTables(tables)
+
+Throw an `ArgumentError` unless the bead-type tables `K`, `D` and `E` are square,
+of the same size, and symmetric. The energy reads each bond's entries as
+`X[s_i, s_j]` in one bead order when built from scratch (`seq2NetParams`) and in
+another when updated after a mutation (`mutateBead!`), so a non-symmetric table
+would silently give inconsistent energies.
+"""
+function checkTables(tables::Tables)
+    q = size(tables.K, 1)
+    for (name, X) in (("K", tables.K), ("D", tables.D), ("E", tables.E))
+        size(X) == (q, q) || throw(ArgumentError("tables.$name has size $(size(X)); expected ($q, $q)"))
+        issymmetric(X) || throw(ArgumentError("tables.$name must be symmetric"))
+    end
+    return nothing
 end
 
 

@@ -37,6 +37,7 @@ export
     buildMismatchTable,
     buildContactEnergyTable,
     makeTables,
+    checkTables,
     randSeq,
     buildNetwork,
     buildRandNetwork,
