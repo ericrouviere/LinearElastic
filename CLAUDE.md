@@ -1,102 +1,31 @@
 # CLAUDE.md
 
-## Project overview
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Julia package `LinearElastic` (author Eric Rouviere, started Oct 2024). It is a 2D linear elastic network
-model of a protein that is evolved in silico. The question: does selection in fluctuating environments
-(selection for evolvability) produce latent allostery in a model with no bistable switch? It is the successor of an
-earlier "v15" model. Plotting uses PyPlot (matplotlib) and data uses JLD2. Julia 1.12 is installed via juliaup.
+## What this is
 
-### Physics (src/physics.jl, src/buildnetwork.jl)
-- Beads sit on a perturbed triangular lattice of size `W`×`L` (`L` must be odd). The default is 11×11, which gives 115 beads.
-  Positions are stored as a flat vector `R = [x1,y1,x2,y2,...]` (2D only, so `N_sdims=2` is asserted in places).
-- Each bead has a type in `1:N_types`, and a sequence is a `Vector{Int}` of types. The bond between beads i and j has
-  stiffness `K[seq[i],seq[j]]` (log-uniform in `[k_min,k_max]`) and rest-length mismatch `D[seq[i],seq[j]]`
-  (Gaussian with sd `mismatchVar`). The `E` contact-energy table exists but is unused (`energyVar=0`).
-- Energy: `U(r) = ½ r'Hr + h'r + c` with `H = T'ΓT`, `h = T'ΓM·1` and `c = ½·1'ΓM²1`. Here `T` is the beads-to-bonds matrix
-  (`makeBeads2BondsMatrix`), `Γ = diag(k)` and `M = diag(d)`. The free energy is the ground-state energy (`-½h'Gh + c`)
-  plus the fluctuation term from `log pdet(H)`. There are 3 zero modes in 2D.
-- The `Network` struct caches `G = pinv(H)`, `lpdH = log pdet(H)`, `h` and `c`. The `δ*` fields are **scratch buffers**.
-  `computeFreeEnergy(net, per, ...)` overwrites `net.δG`/`net.δh` with `G+δG`/`h+δh`.
-- A `Perturbation(bonds, Δk, Δd)` changes the stiffness and mismatch of a set of bonds. `computePerturbedNetParams!` applies it
-  as a low-rank Woodbury update to `G` plus the matrix determinant lemma for `lpdH`, so no re-SVD is needed. Mutations
-  (`mutateBead!`) are also Perturbations on all bonds of the mutated bead. They are applied in place and accumulate
-  numerical error over many mutations.
-- `Ligands.list[1]` is the **solvent/reference** state, and `list[2]`, `list[3]` are ligands 1 and 2. Binding energy is
-  `ΔF = F_lig − F_solvent` (negative means a good binder). Population fitness is `F_solvent − F_lig` (positive means a good binder), and
-  column `k` of `fits` is environment k, i.e. ligand k.
+LinearElastic is a Julia package (author Eric Rouviere, started Oct 2024) implementing a 2D linear elastic network
+model of a protein that is evolved in silico. The question: does selection in fluctuating environments (selection for
+evolvability) produce latent allostery in a model with no bistable switch? It is the successor of an earlier "v15"
+model, and the sister project of `../SpinModel`, whose organization, naming and experiment workflow it follows.
 
-### Evolution (src/evolve.jl, src/ensemble.jl)
-- `evolveMC`: a single-trajectory Metropolis walk under an assay string (`"Binding"`, `"Generalist"`, `"Cooperativity"`,
-  `"TargetBinding"`; see `fitness.jl`). It is used in the notebooks.
-- `evolvePop!`: Wright-Fisher-like population of size `P`. Per-site mutation probability is `μ`. The environment alternates between
-  ligand 1 and ligand 2 every `τ` generations. Selection weights are a sigmoid `1/(1+exp(-a(f-x0)))` with
-  `selParams=(a,x0)`. It samples `N_seqs2Keep` sequences from the last half of the run.
-- `evolvePopEns` maps over seeds (serially, not with pmap). Its output is `Vector{Vector{Vector{Int}}}` (rep → seq → beads).
-  `convertPopulations2PopArray` turns that into an `Int8` array `(N_beads, N_seqs2Keep, N_reps)` for saving.
-- `computeBindingDMSEns` returns `DMS[type, bead, lig, seq, rep]` (ΔΔF of every single mutant) and `ΔF[lig, seq, rep]`.
+## Julia
 
-### Directory layout
-- `src/` holds the module. `LinearElastic.jl` includes the files and lists the exports. `old.jl` and `potts.jl` are **not**
-  included (fully commented-out dead code).
-- `exps/NNN/`: one directory per experiment. Each one has three parts:
-  - `scripts/make_settings.jl` builds a settings `Dict S` (including the `Tables` and `Ligands` objects) and **wipes and
-    recreates** `../ens/`. It writes `ens/MMM/scripts/settings.jld2` for each value of a swept parameter (`the_list_1`,
-    usually `τ ∈ [1,2,4,...,256]`).
-  - `scripts/run.apply` copies `run.jl` and `run.sbatch` into each `ens/*/scripts/` and `sbatch`es them. `run.jl` then writes
-    `ens/MMM/data/{seeds,populations,dms,binding_energies}.jld2`.
-  - `analysis/analysis_before_after.ipynb` loads the `ens` data and makes the result figures.
-  - `ens/` is about 4.4 GB, is git-ignored, and was produced on the UChicago **midway** cluster (account `pi-ranganathanr`,
-    partition `caslake`, remote path `/home/rouviere/LinearElastic`). `exps/download_data_midway.sh` scp's it back.
-- `exps/README` is the experiment log. Summary (all use W=L=11, β=1, mismatchVar=0.1):
-  - 001/002: N_types=10, N_gen=1024, μ=1e-3, τ=4 fixed. They set `S["a"]` per ens member, but the current `run.jl` doesn't read it.
-  - 003: N_types=5. τ sweep from here on.
-  - 004: N_gen=2048, two-bond site `(4,7),(4,16)`.
-  - 005: single bond site `(4,7)`.
-  - 006: k_min=1e-2.
-  - 007: `selParams=(0.25/s,1)`.
-  - 008: k_min=1e-2, μ=3e-3, N_reps=100, N_seqs2Keep=50.
-  - 009: same as 008, but the solvent reference has Δk=0.2 instead of 1.
-  - 010: same as 008, but with a single interior bond site `(47,59)`.
-  - 001–008 scripts use `push!(LOAD_PATH, ...)` and the old name `evolvePopEnsemble` (now `evolvePopEns`), so they will not run
-    as-is against current `src/`. 009 and 010 use `using LinearElastic` directly, so the package must be in the active
-    environment (e.g. `julia --project=<repo root>` or `]dev`).
-- `notebooks/`: exploratory Jupyter (IJulia) notebooks plus figures. `unit_tests/unit_tests.ipynb` is the only test suite
-  (no `test/` dir). It checks the Hessian against the Python `Rigidpy` package via PyCall.
-  `notes.ipynb` has the cross-experiment analysis (it hard-codes absolute Dropbox paths).
-- `Rigidpy/`: a clone of github.com/VardaHagh/Rigidpy with its own `.git`. It is git-ignored and used only by the unit-test notebook.
+```julia
+# Load the package (from within Julia REPL, at repo root)
+using Pkg; Pkg.activate("."); using LinearElastic
 
-### Git
-- Only `src/`, `Project.toml`, `Manifest.toml`, `README`, `CLAUDE.md` and `.gitignore` are tracked. `exps/`, `notebooks/` and
-  `Rigidpy/` are git-ignored, so edits there cannot be committed.
-- The environment is resolved for Julia 1.12 (`julia --project=.`). The newer JLD2 still loads the old experiment `.jld2` files.
+# During development, use Revise so edits are picked up without restart
+using Revise
+using LinearElastic
+```
 
-### Unused code
-- Code in `src/` that isn't reachable from `exps/*/scripts/*.jl`, `notebooks/**/*.ipynb` or `exps/*/analysis/*.ipynb` is
-  commented out (not deleted) and marked `# UNUSED`. The matching exports are commented out too. Uncomment it if needed.
-- `old.jl` and `potts.jl` are fully commented out and not included in the module.
-- `computeHessian`, `computePerturbedNetParams_old`, `pdetdiagm` and the matrix method of `logpdet` are used only by
-  `notebooks/unit_tests/unit_tests.ipynb`.
+The environment is resolved for Julia 1.12 (installed via juliaup). Tests are standalone scripts in `test/`:
 
-### Bugs fixed (Oct 2026) and their effect on existing data
-- `updateNetParams!` now sets `net.lpdH`. It used to be a local no-op. Binding energies were never affected because
-  `lpdH` cancels in them.
-- `computeBindingRandSeqs` now returns `(ΔF, std, mean)`, which is the order every caller unpacks (`ΔF, s, m`). Before the fix,
-  experiments 001–010 scaled selection by the **mean** of the random-sequence binding cloud, not its std. Their stored
-  `S["selParams"]` and `S["stdBindRandSeqs"]` (which actually hold the mean) record what was really used. Analysis notebooks
-  that recompute `s` with `computeBindingRandSeqs` now get the true std, which won't match the stored selection scale.
-- The `N_seqs2Keep` default in `evolvePop`, `evolvePop_seqsOnly` and `evolvePopEns` was `length(nets)` (undefined). It is now `P`.
-- `evolvePop` and `evolvePop_seqsOnly` now pass `sampleLastHalf` through to `evolvePop!`.
-
-### Gotchas / open questions
-- `evolvePopEns` builds `k_init_vec` from two `ones(...)` blocks, so every replicate starts in environment 1. Alternating
-  starts (`[ones; 2 .* ones]`) may have been intended. This is unconfirmed, so it is left unchanged.
-- The `"Binding"` and `"Cooperativity"` assays in `computeFitness` expect exactly 2 and 4 ligand states. `"Generalist"` expects 3.
-- `settings.jld2` stores `Tables`/`Ligands`/`Perturbation` structs. Changing those type definitions breaks loading old
-  experiment settings with JLD2.
-- `make_settings.jl` draws random `Tables` without a seed. The saved `settings.jld2` is the only record of an experiment's tables.
-
-
+```bash
+julia --project=. test/test_physics.jl   # low-rank updates vs. building from scratch, DMS
+julia --project=. test/test_evolve.jl    # assays, fitness map, seeded/parallel ensembles
+```
 
 ### Code Style & Idioms
 
@@ -139,3 +68,126 @@ earlier "v15" model. Plotting uses PyPlot (matplotlib) and data uses JLD2. Julia
 - Don't overuse macros (prefer functions); `eval` inside a macro is a red flag.
 - Don't overload Base methods on container types you don't own; avoid type piracy (extending Base/others' methods on foreign types).
 - Don't expose unsafe operations at the interface; put `unsafe` in the name or check safety.
+
+## Core data types (`src/types.jl`, `src/fitness.jl`)
+
+| Type | Role |
+|------|------|
+| `Tables` | Fixed for an experiment: bead positions `R = [x1,y1,x2,y2,...]`, adjacency `A`, stiffness table `K`, mismatch table `D`, contact table `E` (unused) |
+| `Network` | One evolving sequence and its cached energy parameters `G = pinv(H)`, `lpdH = log pdet(H)`, `h`, `c`. The `δ*` fields are scratch buffers |
+| `Perturbation` | `bonds`, `Δk`, `Δd`: changes in stiffness and rest-length mismatch of a set of bonds. Used for ligands and mutations |
+| `Ligands` | `list::Vector{Perturbation}`; `list[1]` is the solvent, `list[2]`, `list[3]` the two environments |
+| `EvoParams` | Evolutionary parameters: `P` (population), `N` (generations), `μ` (per-site mutation rate), `τ` (env timescale), `α` (selection strength). Built from settings with `convertEvoParams(S)` |
+| `Assay` | Selective pressure, passed as a value: `Binding()`, `DoubleBinding()`, `Allostery()`, `TargetBinding(ΔF1_target, ΔF2_target)` |
+
+## Architecture
+
+### Physics (`src/buildnetwork.jl`, `src/physics.jl`)
+- Beads sit on a perturbed triangular lattice of size `W`×`L` (`L` odd). The default 11×11 gives 115 beads. 2D only
+  (`N_sdims=2` is asserted in places).
+- Each bead has a type in `1:N_types`, and a sequence is a `Vector{Int}` of types. The bond between beads i and j has
+  stiffness `K[seq[i],seq[j]]` (log-uniform in `[k_min,k_max]`) and mismatch `D[seq[i],seq[j]]` (Gaussian, sd `mismatchVar`).
+- Energy: `U(r) = ½ r'Hr + h'r + c` with `H = T'ΓT`, `h = T'ΓM·1`, `c = ½·1'ΓM²1`. Here `T` is the beads-to-bonds matrix
+  (`makeBeads2BondsMatrix`), `Γ = diag(k)` and `M = diag(d)`. The free energy is the ground-state energy (`-½h'Gh + c`)
+  plus the fluctuation term from `log pdet(H)` (3 zero modes in 2D). Unlike SpinModel, `β` is a real parameter here:
+  it weighs the fluctuation term against the ground-state energy.
+- `computePerturbedNetParams!` applies a `Perturbation` as a low-rank Woodbury update to `G` plus the matrix determinant
+  lemma for `lpdH`, so no re-SVD is needed. Mutations (`mutateBead!`) are Perturbations on all bonds of the mutated bead,
+  applied in place. `computeFreeEnergy(net, per, ...)` overwrites `net.δG`/`net.δh` with `G+δG`/`h+δh`.
+- Binding energy is `ΔF = F_lig − F_solvent` (negative = good binder). Population fitness in environment k is
+  `F_solvent − F_lig_k` (positive = good binder).
+
+### Fitness assays (`src/fitness.jl`)
+Selective pressures are `Assay` types passed as values, not strings. `computeFitness(net, ligands, tables, assay, β)`
+dispatches on the type; add a pressure with a new struct plus one `computeFitness(::NewAssay, energies)` method.
+`Binding` needs 2 ligand states, `DoubleBinding` (the generalist score `min(-ΔF1, -ΔF2)`) and `TargetBinding` need 3,
+`Allostery` needs 4.
+
+### Evolution (`src/evolve.jl`)
+- `evolveMC(net, ligands, tables, assay, N_iter, ζ, β; Δt, ϕ_terminate)`: single-trajectory Metropolis walk under an `Assay`.
+- `evolvePop!(nets, ligands, tables, β, evo; k_init, sampleLastHalf, N_seqs2Keep)`: population of `evo.P` networks under
+  fluctuating selection; the environment switches between ligand 1 and 2 every `τ` generations. Returns
+  `(fitBucket, netBucket)`; samples `N_seqs2Keep` networks from the last half of the run, aligned to the env cycle.
+- `evolvePop(ligands, tables, β, evo, seed; k_init, ...)`: seeded runner that builds a random population, evolves it and
+  returns only the sampled sequences.
+- Selection uses the exponential fitness map `fits2weights(f, α) = exp(α (f − max f))`.
+
+### Ensemble (`src/ensemble.jl`)
+Naming convention: append `Ensemble` to the single-run function name (`evolvePopEnsemble`, `computeBindingDMSEnsemble`).
+- `evolvePopEnsemble(ligands, tables, β, evo, seeds; k_init_vec, N_seqs2Keep, pool)` evolves one replicate per seed over
+  a Distributed worker pool. Each replicate seeds its worker's RNG, so results do not depend on scheduling. `k_init_vec`
+  defaults to a random initial environment per replicate. Output is `Vector{Vector{Vector{Int}}}` (rep → seq → beads);
+  `convertPopulations2PopArray` turns it into an `Int8` array `(N_beads, N_seqs2Keep, N_reps)` for saving.
+- `computeBindingDMSEnsemble(populations, ligands, tables, β; pool)` runs one flat `pmap` over all sequences and returns
+  `DMS[type, bead, lig, seq, rep]` (ΔΔF of every single mutant) and `ΔF[lig, seq, rep]`.
+- Pass `pool=CachingPool(workers())` so `tables`/`ligands` ship to each worker once. Workers use 1 BLAS thread, so
+  parallel DMS values can differ from a serial run by ~1e-13; evolved populations are bit-identical.
+
+### Analysis and plotting (`src/analysis.jl`, `src/plotfuncs.jl`)
+DMS and double-mutant scans, mutational sensitivity vs. distance from the active site, stress and normal-mode overlaps.
+Plotting uses PyPlot (matplotlib via PyCall); in-place variants take an `ax` and end in `!`.
+
+## Running simulations (`exps/`)
+
+A simulation lives in a numbered experiment directory `exps/NNN/` with a `scripts/` subdir holding `make_settings.jl`,
+`run.jl`, `run.apply` and `run.sbatch`. New experiments are made by copying the latest one (011 is the current template).
+Run from inside `exps/NNN/scripts/`:
+
+```bash
+julia make_settings.jl   # build the settings.jld2 files
+bash run.apply           # submit one job per ens directory (sbatch); swap in `julia run.jl` to run locally
+```
+
+1. **`make_settings.jl`** activates the project via `@__DIR__`, builds seeded `Tables` (`table_seed`) and the ligands,
+   sets the evolutionary params and run controls (`seed` = master RNG seed, `N_workers`, `N_reps`, `N_seqs2Keep`), and
+   writes one `ens/<NNNN>/scripts/settings.jld2` per (τ, μ) pair. Selection strength is `α = a / ΔF_0`, with `ΔF_0`
+   the std of random-sequence binding energies.
+2. **`run.apply`** exports `JULIA_PROJECT` (repo root, derived from the script's location), copies `run.jl` and
+   `run.sbatch` into each `ens/<NNNN>/scripts/`, and submits. `--cpus-per-task` in `run.sbatch` should be `N_workers + 1`.
+3. **`run.jl`** loads `settings.jld2`, calls `addprocs(S["N_workers"])`, derives per-replicate seeds and initial
+   environments from the master seed, evolves `N_reps` populations in parallel, then runs the DMS. Each analysis phase
+   is timed and isolated.
+
+Outputs land in `ens/<NNNN>/data/`: `populations`, `dms`, `binding_energies`, plus `seeds` (master seed, per-replicate
+seeds, `k_init_vec`) and `run_meta` (Julia version, worker count, git commit, timestamp). To reproduce a run, load
+`seeds.jld2` and call `evolvePopEnsemble(ligands, tables, β, evo, seeds; k_init_vec, N_seqs2Keep)`.
+
+The cluster is UChicago **midway** (account `pi-ranganathanr`, partition `caslake`, remote path
+`/home/rouviere/LinearElastic`); `exps/download_data_midway.sh` scp's `ens/` back. `exps/README` is the experiment log:
+- All use W=L=11, β=1, mismatchVar=0.1.
+- 001/002: N_types=10, N_gen=1024, μ=1e-3, τ=4 fixed.
+- 003: N_types=5. τ sweep from here on.
+- 004: N_gen=2048, two-bond site `(4,7),(4,16)`.
+- 005: single bond site `(4,7)`.
+- 006: k_min=1e-2.
+- 007: `selParams=(0.25/s,1)`.
+- 008: k_min=1e-2, μ=3e-3, N_reps=100, N_seqs2Keep=50.
+- 009: same as 008, but the solvent reference has Δk=0.2 instead of 1.
+- 010: same as 008, but with a single interior bond site `(47,59)`.
+- 011: new template, same physics as 010. Not yet run.
+
+**001–010 and the notebooks use the old API** (`selParams` sigmoid selection, string assays, `*Ens` names, positional
+evolution parameters). Run them against the `old-api` git tag (`git worktree add ../LinearElastic-old old-api`).
+Their saved data is unaffected.
+
+## Bugs fixed (Oct 2026) and their effect on existing data
+- `updateNetParams!` now sets `net.lpdH`. It used to be a local no-op. Binding energies were never affected because
+  `lpdH` cancels in them.
+- `computeBindingRandSeqs` now returns `(ΔF, std, mean)`, the order every caller unpacks (`ΔF, s, m`). Experiments
+  001–010 scaled selection by the **mean** of the random-sequence binding cloud, not its std. Their stored
+  `S["selParams"]` and `S["stdBindRandSeqs"]` (which actually hold the mean) record what was really used.
+- 001–010 started every replicate in environment 1 (`k_init_vec` was two `ones(...)` blocks).
+- The sigmoid selection of 001–010 equals the current exponential map with `α = a` whenever `a (max f − x0) < −100`
+  (e.g. 010). Experiment 009 (`a ≈ 0.94`) was in the sigmoid's flat regime, so selection there was weak (fitness
+  weights varied by only ~20% across the population).
+
+## Key conventions
+- `exps/`, `notebooks/` and `Rigidpy/` (a clone of github.com/VardaHagh/Rigidpy, used by the unit-test notebook) are
+  git-ignored large/data directories. Only `src/`, `test/`, the package files, `README` and `CLAUDE.md` are tracked.
+- `src/old/` contains deprecated code kept verbatim for reference (`<file>_old_funcs.jl`, and removed exports in
+  `LinearElastic_old_exports.jl`); do not use or modify it.
+- `computeHessian`, `computePerturbedNetParams_old`, `pdetdiagm` and the matrix method of `logpdet` are kept only for
+  `notebooks/unit_tests/unit_tests.ipynb`.
+- `settings.jld2` stores `Tables`/`Ligands`/`Perturbation` structs. Changing those type definitions breaks loading old
+  experiment settings with JLD2.
+
