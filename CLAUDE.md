@@ -179,7 +179,7 @@ evolution parameters). Run them against the `old-api` git tag (`git worktree add
 Their saved data is unaffected.
 
 ## Methods write-up
-`docs/methods.md` describes the model and the exps/011 protocol as a journal methods section (energy, free energy,
+`methods.md` describes the model and the exps/011 protocol as a journal methods section (energy, free energy,
 ligand binding, phenotype, evolutionary dynamics, parameter table). With the current ligands every state inserts the
 same spring stiffness, so the fluctuation term cancels and binding depends on the sequence only through the site's
 pre-strain `e₀ = b'G'h` and compliance `χ = b'G'b`; keep the note in sync when the model or protocol changes.
