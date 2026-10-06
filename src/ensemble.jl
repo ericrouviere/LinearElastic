@@ -27,13 +27,13 @@ function evolvePopEnsemble(seeds::Vector{UInt},
                       N_gen::Int, # number of generations
                       μ::Number, # mutation rate
                       τ::Int, # enviromental timescale
-                      selParams::Tuple;
+                      α::Number; # selection strength
                       N_seqs2Keep::Int=P)
     
     # evolve many replicate populations.
     N_reps = length(seeds)
     k_init_vec = [ones(Int, Int(floor(N_reps / 2))); ones(Int, Int(ceil(N_reps / 2)))]
-    seqsList= map( (x,y) -> evolvePop_seqsOnly(P, ligands, tables, β, N_gen, μ, τ, selParams, x;
+    seqsList= map( (x,y) -> evolvePop_seqsOnly(P, ligands, tables, β, N_gen, μ, τ, α, x;
                              k_init=y, N_seqs2Keep), seeds, k_init_vec)
     return seqsList
 end

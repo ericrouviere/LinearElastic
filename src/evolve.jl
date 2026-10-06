@@ -51,7 +51,7 @@ function evolvePop!(nets::Vector{Network}, # population of networks
                     N_gen::Int, # number of generations
                     μ::Number, # mutation rate
                     τ::Int, # enviromental timescale
-                    selParams::Tuple;
+                    α::Number; # selection strength
                     k_init::Int=1, # Initial enviroment
                     sampleLastHalf::Bool=true, # if true sample last half, if false return final
                     N_seqs2Keep::Int=length(nets))
@@ -81,7 +81,7 @@ function evolvePop!(nets::Vector{Network}, # population of networks
         fitBucket[:,:,t] .= fits
 
         # apply selection 
-        applySelection!(nets, fits, selParams, k) 
+        applySelection!(nets, fits, α, k) 
 
         # mutation 
         mutatedRecord = mutateAtRate!.(nets, μ, [tables]) # mutation all sequences every generation.
@@ -108,7 +108,7 @@ function evolvePop_seqsOnly(P::Integer, # population size
                    N_gen::Int, # number of generations
                    μ::Number, # mutation rate
                    τ::Int, # enviromental timescale
-                   selParams::Tuple,
+                   α::Number, # selection strength
                    seed::UInt; # set the seed
                    k_init::Int=1, # Initial enviroment
                    sampleLastHalf::Bool=true, # if true sample last half, if false return final
@@ -117,7 +117,7 @@ function evolvePop_seqsOnly(P::Integer, # population size
     # return only a vector or sequences
     Random.seed!(seed)
     nets = [buildRandNetwork(tables) for i in 1:P]
-    fitBucket, netBucket = evolvePop!(nets, ligands, tables, β, N_gen, μ, τ, selParams; k_init, sampleLastHalf, N_seqs2Keep);
+    fitBucket, netBucket = evolvePop!(nets, ligands, tables, β, N_gen, μ, τ, α; k_init, sampleLastHalf, N_seqs2Keep);
     return map(x -> x.seq, netBucket) # return only the sequences. 
 end
 
@@ -142,27 +142,27 @@ function updateAllFitnesses!(fits::Matrix,
 end
 
 
-function fits2weights(fits::AbstractVector, a::Number, x0::Number)
-    # define sigmoid binding to fitness map.
-    mx  = maximum( x -> a*(x-x0), fits)
-    if mx < -100
-        w = exp.( a .* ( fits .- x0 ) .- mx)
-    else
-        w = 1 ./ ( 1 .+  exp.( -a .* (fits .- x0)) )
-    end
-    return w
+"""
+    fits2weights(fits, α)
+
+Exponential map from fitness to selection weight, `w = exp(α (f - max f))`.
+Larger `α` means stronger selection. Subtracting `max f` sets the largest
+weight to 1, which avoids overflow without changing relative selection.
+"""
+function fits2weights(fits::AbstractVector, α::Number)
+    return exp.(α .* (fits .- maximum(fits)))
 end
 
 function applySelection!(nets::Vector{Network},
                          fits::Matrix,
-                         selParams::Tuple,
+                         α::Number, # selection strength
                          k::Int) # the environment index
-    # apply sigmoidal probablity selection.
-    # 1. fitnesses in env k pass through sigmoid to get a weight
+    # apply exponential probablity selection.
+    # 1. fitnesses in env k pass through fits2weights to get a weight
     # 2. sequences are drawn for survival according to weight
     @views f = fits[:,k]
     P = length(f) 
-    w = fits2weights( f, selParams...)
+    w = fits2weights(f, α)
     winners = wsample(1:P, w, P)
     
     uniques, repeats, holes = splitIntoUniqesAndRepeats(winners)

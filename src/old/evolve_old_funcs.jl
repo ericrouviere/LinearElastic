@@ -19,3 +19,17 @@
 #    nets = [buildRandNetwork(tables) for i in 1:P]
 #    return evolvePop!(nets, ligands, tables, β, N_gen, μ, τ, selParams; k_init, sampleLastHalf, N_seqs2Keep);
 #end
+
+# Sigmoid fitness-to-weight map, replaced by the exponential map
+# fits2weights(fits, α) = exp.(α .* (fits .- maximum(fits))).
+# selParams = (a, x0) was splatted into it from applySelection!.
+#function fits2weights(fits::AbstractVector, a::Number, x0::Number)
+#    # define sigmoid binding to fitness map.
+#    mx  = maximum( x -> a*(x-x0), fits)
+#    if mx < -100
+#        w = exp.( a .* ( fits .- x0 ) .- mx)
+#    else
+#        w = 1 ./ ( 1 .+  exp.( -a .* (fits .- x0)) )
+#    end
+#    return w
+#end
