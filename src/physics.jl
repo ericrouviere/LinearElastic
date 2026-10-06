@@ -1,14 +1,15 @@
 
-function computeFreeEnergy(H::Matrix, h::Vector, c::Number, β::Number; N_sdims::Integer=2)
-    # compute the free energy of energy landscape with the form
-    # U(r) = 1/2 r'Hr + h'r + c
-    N_dims = length(h)
-    GSE = - 0.5 * dot(h, pinv(H), h) + c # ground state energy
-    lpd = logpdet(H; N_sdims) # this should be log(det(Hessian))
-    FLE = -0.5*( N_dims*log(2*pi/β) - lpd ) / β # Flucutation energy
-    F = GSE + FLE
-    return F
-end
+# UNUSED: not called from exps/*/scripts or notebooks (commented out, not deleted)
+#function computeFreeEnergy(H::Matrix, h::Vector, c::Number, β::Number; N_sdims::Integer=2)
+#    # compute the free energy of energy landscape with the form
+#    # U(r) = 1/2 r'Hr + h'r + c
+#    N_dims = length(h)
+#    GSE = - 0.5 * dot(h, pinv(H), h) + c # ground state energy
+#    lpd = logpdet(H; N_sdims) # this should be log(det(Hessian))
+#    FLE = -0.5*( N_dims*log(2*pi/β) - lpd ) / β # Flucutation energy
+#    F = GSE + FLE
+#    return F
+#end
 
 function computeFreeEnergy(G::Matrix, lpdH::Number, h::Vector, c::Number, β::Number; N_sdims::Integer=2)
     # compute the free energy of energy landscape with the form
@@ -175,11 +176,12 @@ function seq2NetParams(seq, tables::Tables)
     return H, h, c
 end
 
-function getNetParams_old(seq::Vector, tables::Tables)
-    # the old way to compute the network parameters
-    H, h, c = seq2NetParams(seq, tables)
-    return pinv(H), logpdet(H), h, c
-end
+# UNUSED: not called from exps/*/scripts or notebooks (commented out, not deleted)
+#function getNetParams_old(seq::Vector, tables::Tables)
+#    # the old way to compute the network parameters
+#    H, h, c = seq2NetParams(seq, tables)
+#    return pinv(H), logpdet(H), h, c
+#end
 
 function getNetParams(seq::Vector, tables::Tables)
     # compute the network parameters using 1 svd.
