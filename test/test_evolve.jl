@@ -90,4 +90,19 @@ end
         @test ΔF[:, 2, 3] ≈ computeBindingEnergies(net, ligands, tables, β)
         @test DMS[:, :, :, 2, 3] ≈ computeBindingDMS(net, ligands, tables, β)
     end
+
+    @testset "stress ensembles take one population or a set of replicates" begin
+        # the analysis notebooks broadcast over ensembles, which passes each
+        # ensemble's replicate → sequence → beads list to these methods
+        tables, ligands = testSetup()
+        seqsList = [[randSeq(tables.R, tables.K) for _ in 1:2] for _ in 1:3]
+        st = computeStressEnsemble(seqsList, tables)
+        bs = computeBindingStressEnsemble(seqsList, ligands, tables)
+        @test size(st) == size(bs) == (2, 3)
+        @test st[:, 3] == computeStressEnsemble(seqsList[3], tables)
+        @test bs[:, 3] == computeBindingStressEnsemble(seqsList[3], ligands, tables)
+        @test computeMaxOverlapEnsemble(seqsList, ligands, tables)[:, 3] ≈
+              computeMaxOverlapEnsemble(seqsList[3], ligands, tables)
+        @test generalist([-0.1, 0.2]) == -0.2
+    end
 end

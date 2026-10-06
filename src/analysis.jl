@@ -310,3 +310,11 @@ end
 computeMaxOverlap(seq::Vector, ligands::Ligands, tables::Tables) = maximum(abs, computeOverlaps(seq, ligands, tables))
 
 
+"""
+    generalist(ΔF)
+
+Generalist score `min(-ΔF[1], -ΔF[2])` from the binding energies `ΔF` to the two
+ligands (as stored in `binding_energies.jld2`). Applied per sequence with
+`mapslices(generalist, ΔF, dims=1)`.
+"""
+generalist(ΔF::AbstractVector) = min(-ΔF[1], -ΔF[2])

@@ -111,14 +111,32 @@ end
 function computeStressEnsemble(seqs::Vector{Vector{T}}, tables::Tables) where T <: Integer
     return map( x -> computeStress(x, tables), seqs)
 end
+function computeStressEnsemble(seqs::Vector{Vector{Vector{T}}}, tables::Tables) where T <: Integer
+    stress = zeros(length(seqs[1]), length(seqs))
+    for j in axes(stress, 2), i in axes(stress, 1)
+        stress[i,j] = computeStress(seqs[j][i], tables)
+    end
+    return stress
+end
 
 function computeBindingStressEnsemble(seqs::Vector{Vector{T}}, ligands::Ligands, tables::Tables) where T <: Integer
     return map( x -> computeBindingStress(x, ligands, tables), seqs)
+end
+function computeBindingStressEnsemble(seqs::Vector{Vector{Vector{T}}}, ligands::Ligands, tables::Tables) where T <: Integer
+    stress = zeros(length(seqs[1]), length(seqs))
+    for j in axes(stress, 2), i in axes(stress, 1)
+        stress[i,j] = computeBindingStress(seqs[j][i], ligands, tables)
+    end
+    return stress
 end
 
 
 function computeMaxOverlapEnsemble(seqs::Vector{Vector{T}}, ligands::Ligands, tables::Tables) where T <: Integer
     return map( x -> computeMaxOverlap(x, ligands, tables), seqs)
+end
+function computeMaxOverlapEnsemble(seqs::Vector{Vector{Vector{T}}}, ligands::Ligands, tables::Tables) where T <: Integer
+    newseqs = hcat(seqs...)
+    return pmap( x -> computeMaxOverlap(vec(x), ligands, tables), newseqs)
 end
 
 

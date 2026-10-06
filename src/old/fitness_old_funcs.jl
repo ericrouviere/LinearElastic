@@ -26,7 +26,7 @@
 #end
 
 # String-based assay dispatch, replaced by the Assay types in src/fitness.jl.
-# The unused generalist(ΔF::Vector) method was dropped from the export list.
+# generalist(ΔF::Vector) lives on in src/analysis.jl.
 #binding(F0::Number, F1::Number) = F0-F1 # strong binders > 0
 #generalist(F0::Number, F1::Number, F2::Number) = min(binding(F0,F1), binding(F0,F2))
 #generalist(ΔF::Vector) = min( -ΔF[1], -ΔF[2]) # here ΔF is the binding energy

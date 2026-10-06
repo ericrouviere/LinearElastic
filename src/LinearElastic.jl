@@ -100,6 +100,7 @@ export
     computeConfChange,
     computeOverlaps,
     computeMaxOverlap,
+    generalist,
 
     # from plotfuncs.jl
     plotNetwork!,
