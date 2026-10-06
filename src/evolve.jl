@@ -117,7 +117,7 @@ function evolvePop(P::Integer, # population size
     # generate population of networks and evolve it.
     Random.seed!(seed)
     nets = [buildRandNetwork(tables) for i in 1:P]
-    return evolvePop!(nets, ligands, tables, β, N_gen, μ, τ, selParams; k_init, N_seqs2Keep);
+    return evolvePop!(nets, ligands, tables, β, N_gen, μ, τ, selParams; k_init, sampleLastHalf, N_seqs2Keep);
 end
 
 function evolvePop_seqsOnly(P::Integer, # population size
@@ -136,7 +136,7 @@ function evolvePop_seqsOnly(P::Integer, # population size
     # return only a vector or sequences
     Random.seed!(seed)
     nets = [buildRandNetwork(tables) for i in 1:P]
-    fitBucket, netBucket = evolvePop!(nets, ligands, tables, β, N_gen, μ, τ, selParams; k_init, N_seqs2Keep);
+    fitBucket, netBucket = evolvePop!(nets, ligands, tables, β, N_gen, μ, τ, selParams; k_init, sampleLastHalf, N_seqs2Keep);
     return map(x -> x.seq, netBucket) # return only the sequences. 
 end
 
