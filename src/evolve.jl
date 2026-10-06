@@ -99,16 +99,22 @@ function evolvePop!(nets::Vector{Network}, # population of networks
 end
 
 
-function evolvePop_seqsOnly(ligands::Ligands,
+"""
+    evolvePop(ligands, tables, β, evo, seed; k_init, sampleLastHalf, N_seqs2Keep)
+
+Seeded variant of `evolvePop!`: build a random population of `evo.P` networks
+and evolve it, returning only the sampled sequences. Seeds the global RNG with
+`seed` first, so the initial population, mutations, selection and sampling are
+exactly reproducible.
+"""
+function evolvePop(ligands::Ligands,
                    tables::Tables,
                    β::Number, # Physical Temp
                    evo::EvoParams,
-                   seed::UInt; # set the seed
+                   seed::Integer;
                    k_init::Int=1, # Initial enviroment
                    sampleLastHalf::Bool=true, # if true sample last half, if false return final
                    N_seqs2Keep::Int=evo.P) 
-    # generate population of networks and evolve it
-    # return only a vector or sequences
     Random.seed!(seed)
     nets = [buildRandNetwork(tables) for i in 1:evo.P]
     fitBucket, netBucket = evolvePop!(nets, ligands, tables, β, evo; k_init, sampleLastHalf, N_seqs2Keep);

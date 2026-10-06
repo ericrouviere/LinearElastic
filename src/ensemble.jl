@@ -19,31 +19,50 @@ function evolveMCEnsemble(N_reps::Int,
 end
 
 
-function evolvePopEnsemble(seeds::Vector{UInt},
-                      ligands::Ligands,
-                      tables::Tables,
-                      β::Number, # Physical Temp
-                      evo::EvoParams;
-                      N_seqs2Keep::Int=evo.P)
-    
-    # evolve many replicate populations.
-    N_reps = length(seeds)
-    k_init_vec = [ones(Int, Int(floor(N_reps / 2))); ones(Int, Int(ceil(N_reps / 2)))]
-    seqsList= map( (x,y) -> evolvePop_seqsOnly(ligands, tables, β, evo, x;
-                             k_init=y, N_seqs2Keep), seeds, k_init_vec)
-    return seqsList
+"""
+    evolvePopEnsemble(ligands, tables, β, evo, seeds; k_init_vec, N_seqs2Keep, pool)
+
+Evolve one replicate population per entry of `seeds`, in parallel over the
+worker pool (serially when no workers have been added). Replicate `i` seeds its
+worker's RNG with `seeds[i]` and starts in environment `k_init_vec[i]`, so the
+ensemble is exactly reproducible from the saved `seeds` and `k_init_vec`
+regardless of how replicates are scheduled across workers. Pass
+`pool=CachingPool(workers())` to ship `ligands` and `tables` to each worker once.
+Returns `Vector{Vector{Vector{Int}}}` (replicate → sequence → beads).
+"""
+function evolvePopEnsemble(ligands::Ligands,
+                           tables::Tables,
+                           β::Number, # Physical Temp
+                           evo::EvoParams,
+                           seeds::AbstractVector{<:Integer};
+                           k_init_vec=rand(1:(length(ligands.list)-1), length(seeds)),
+                           N_seqs2Keep::Int=evo.P,
+                           pool::AbstractWorkerPool=default_worker_pool())
+    @assert length(seeds) == length(k_init_vec)
+    return pmap((s, k) -> evolvePop(ligands, tables, β, evo, s; k_init=k, N_seqs2Keep),
+                pool, seeds, k_init_vec)
 end
 
 
+"""
+    computeBindingDMSEnsemble(seqsList, ligands, tables, β; pool)
+
+Deep mutational scan of every sequence in `seqsList` (replicate → sequence →
+beads), run as one flat `pmap` over all sequences. Returns
+`DMS[type, bead, lig, seq, rep]` (ΔΔF of every single mutant) and the binding
+energies `ΔF[lig, seq, rep]`. Pass `pool=CachingPool(workers())` to ship
+`ligands` and `tables` to each worker once.
+"""
 function computeBindingDMSEnsemble(seqsList::Vector{Vector{Vector{T}}},
-                             ligands::Ligands,
-                             tables::Tables,
-                             β::Number) where T <: Integer
-    # pokesListIndex is the index that tell what pokes to use from the
-    # pokes list to measure the energy of. 
-    # pokesIndex allows you choose to measure the energy of only
-    # one strain. pokesIndex=0 used the defalt pokes = pokesList[pokesListIndex].
-    # compute the change the energy of each applied strain for every single mutant.
+                                   ligands::Ligands,
+                                   tables::Tables,
+                                   β::Number;
+                                   pool::AbstractWorkerPool=default_worker_pool()) where T <: Integer
+
+    function kernel(seq)
+        net = buildNetwork(seq, tables)
+        return computeBindingEnergies(net, ligands, tables, β), computeBindingDMS(net, ligands, tables, β)
+    end
 
     N_beads = length(seqsList[1][1])
     P = length(seqsList[1])
@@ -51,16 +70,12 @@ function computeBindingDMSEnsemble(seqsList::Vector{Vector{Vector{T}}},
     N_ligs = length(ligands.list)-1
     N_types = size(tables.K, 1)
 
+    seqsMat = [seqsList[i][j] for j in 1:P, i in 1:N_reps]
+    out = pmap(kernel, pool, seqsMat)
     DMS = Array{Float64, 5}(undef, N_types, N_beads, N_ligs, P, N_reps)
     ΔF = Array{Float64, 3}(undef, N_ligs, P, N_reps)
-
-    net = buildNetwork(seqsList[1][1], tables)
     for i in 1:N_reps, j in 1:P
-        net.seq .= seqsList[i][j] 
-        updateNetParams!(net,  tables)
-        F = computeFreeEnergies(net, ligands, tables, β)
-        ΔF[:,j,i] = [F[2] - F[1], F[3] - F[1]]
-        DMS[:,:,:,j,i] = computeBindingDMS(net, ligands, tables, β)
+        ΔF[:,j,i], DMS[:,:,:,j,i] = out[j,i]
     end
     return DMS, ΔF
 end

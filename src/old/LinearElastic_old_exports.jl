@@ -30,3 +30,6 @@
 
 # from fitness.jl (replaced by Assay types; generalist is now the internal doubleBinding)
 #    generalist,
+
+# from evolve.jl (renamed to evolvePop, the seeded single-replicate runner as in SpinModel)
+#    evolvePop_seqsOnly,

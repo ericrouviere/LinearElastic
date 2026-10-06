@@ -6,7 +6,7 @@ using Statistics
 using Random
 using JLD2
 using Printf
-import Distributed.pmap
+using Distributed
 using StatsBase: wsample
 import PyPlot.PyObject
 import LinearAlgebra: pinv
@@ -64,7 +64,7 @@ export
     # from evolve.jl
     evolveMC,
     evolvePop!,
-    evolvePop_seqsOnly,
+    evolvePop,
     updateAllFitnesses!,
     fits2weights,
     applySelection!,
