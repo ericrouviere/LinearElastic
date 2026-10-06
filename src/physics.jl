@@ -341,6 +341,8 @@ end
 
 function computeBindingRandSeqs(N_seq::Int, ligands::Ligands, tables::Tables, β)
     # generate N_seq random sequences and compute their binding energies.
+    # returns ΔF, s, m: the binding energies, the std of the distance to the
+    # centroid of the ΔF cloud, and the mean of the centroid.
     function computeMeanStdOfPoints(points::Matrix{Float64})
         # Ensure the input is a 1000x2 matrix
         @assert size(points, 2) == 2 "Input must be a Nx2 matrix where each row is a point in 2D space."
@@ -360,7 +362,7 @@ function computeBindingRandSeqs(N_seq::Int, ligands::Ligands, tables::Tables, β
         ΔF[i,2] = energies[3] - energies[1]
     end
     m, s = computeMeanStdOfPoints(ΔF)
-    return ΔF, m, s
+    return ΔF, s, m
 end
 
 function computeBindingEnergies(net::Network, ligands::Ligands, tables::Tables, β::Number)
