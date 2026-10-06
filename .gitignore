@@ -1,0 +1,18 @@
+# Simulation output (~4.4 GB; synced from midway via exps/download_data_midway.sh)
+exps/*/ens/
+exps/*/scripts/logs*/
+*.out
+*.err
+
+# Large generated data/figures (some files exceed GitHub's 100 MB limit)
+notebooks/epistasis/*.csv
+notebooks/figures/population_dynamics_movies/
+
+# External repo (clone of https://github.com/VardaHagh/Rigidpy), only used by unit_tests notebook
+Rigidpy/
+
+# Jupyter / Python / OS cruft
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
+.DS_Store

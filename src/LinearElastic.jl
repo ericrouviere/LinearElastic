@@ -1,0 +1,133 @@
+module LinearElastic
+
+using LinearAlgebra
+using PyPlot
+using Statistics
+using Random
+using JLD2
+using Printf
+import Distributed.pmap
+using StatsBase: wsample
+import PyPlot.PyObject
+import LinearAlgebra: pinv
+
+include("types.jl")
+include("buildnetwork.jl")
+include("physics.jl")
+include("evolve.jl")
+include("fitness.jl")
+include("mutate.jl")
+include("tools.jl")
+include("analysis.jl")
+include("plotfuncs.jl")
+include("ensemble.jl")
+
+export
+
+    #from types.jl
+    Tables,
+    Network,
+    Perturbation,
+    Ligands,
+
+    # from buildnetwork.jl
+    buildStructure,
+    buildSpringTable,
+    buildMismatchTable,
+    buildContactEnergyTable,
+    makeTables,
+    randSeq,
+    buildNetwork,
+    buildRandNetwork,
+
+    # from physics.jl
+    makeBeads2BondsMatrix,
+    seq2NetParams,
+    computeFreeEnergy,
+    computeFreeEnergies,
+    logpdet,
+    computeBondVector,
+    computeBondElongationMode,
+    formatLigandParams,
+    computeBindingFreeEnergy,
+    computePerturbedNetParams!,
+    computePerturbedNetParams_old,
+    pdetdiagm,
+    computePerturbedGroundState,
+    getNetParams,
+    getNetParams_old, # keep for unit tests
+    updateNetParams!,
+    pinv,
+    computeBindingRandSeqs,
+    computeBindingEnergies,
+    computeHessian!, # keep for unit test
+    computeHessian, # keep for unit test
+
+    # from evolve.jl
+    evolveMC,
+    evolvePop!,
+    evolvePop,
+    evolvePop_seqsOnly,
+    updateAllFitnesses!,
+    fits2weights,
+    applySelection!,
+    splitIntoUniqesAndRepeats,
+
+    # from fitness.jl
+    computeFitness,
+    generalist,
+
+    # from mutate.jl
+    mutateBead!,
+    mutateAtRate!,
+
+    # from tools.jl
+    networkCopy!,
+    convertSettings2NetParams,
+    convertSettings2EvoParams,
+
+    # from analysis.jl
+    computeBindingDMS,
+    computeBindingDCS,
+    countMutSensitivity,
+    getStepsVector,
+    getStepsMat,
+    getSiteBeads,
+    scanAllostericSurface,
+    computeAllostery,
+    getSeqWithTargetBinding,
+    compareSeqWithSameBinding,
+    computeStress,
+    computeBindingStress,
+    computeConfChange,
+    computeOverlaps,
+    computeMaxOverlap,
+
+    # from plotfuncs.jl
+    plotNetwork!,
+    plotNetwork,
+    plotDisplacement!,
+    plotBondStiffness!,
+    plotNetworkColoredBonds!,
+    plotDensityBindingSpaceScatter,
+    plotBindingEvoTraces,
+    plotEvoPathBindingSpace,
+    plotGeneralistSpecialistEvoTraces,
+    makePopulationFrame,
+    makePopulationDynamicsMovieFrames,
+    plotDMS,
+    plotMutSensVsDist!,
+    plotMutSensVsDist,
+
+    # from ensemble.jl
+    evolveMCEns,
+    evolvePopEns,
+    computeBindingDMSEns,
+    countMutSensitivityEns,
+    computeStressEns,
+    computeMaxOverlapEns,
+    computeBindingStressEns,
+    convertPopulations2PopArray,
+    convertPopArray2Populations
+    
+end

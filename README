@@ -1,0 +1,10 @@
+Written by Eric Rouviere
+Started Oct 2024
+
+A fully linear elastic network model that offers a different implementation than v15.
+Here mutations change both a springs stiffness, but also change the tension along a bond. U(r) = 0.5 r'Hr + f'r.
+This allows mutations to change the structure which enables binding sites to change the geometry to fit ligand. 
+Ligand binding is modeled by the addition of first and second polynomidal to simulation applied force and stiffness.
+
+As with v15 This model is used to to study if selection for evolvability (fluctuating environments) leads to latent allostery in a model without a bistable switch. 
+
