@@ -2,7 +2,7 @@
 """
 Evolve replicate MC trajectories.
 """
-function evolveMCEns(N_reps::Int,
+function evolveMCEnsemble(N_reps::Int,
                     ligands::Ligands,
                     tables::Tables,
                     assay::String,
@@ -19,7 +19,7 @@ function evolveMCEns(N_reps::Int,
 end
 
 
-function evolvePopEns(seeds::Vector{UInt},
+function evolvePopEnsemble(seeds::Vector{UInt},
                       P::Integer,
                       ligands::Ligands,
                       tables::Tables,
@@ -39,7 +39,7 @@ function evolvePopEns(seeds::Vector{UInt},
 end
 
 
-function computeBindingDMSEns(seqsList::Vector{Vector{Vector{T}}},
+function computeBindingDMSEnsemble(seqsList::Vector{Vector{Vector{T}}},
                              ligands::Ligands,
                              tables::Tables,
                              β::Number) where T <: Integer
@@ -70,7 +70,7 @@ function computeBindingDMSEns(seqsList::Vector{Vector{Vector{T}}},
 end
 
 
-function countMutSensitivityEns(DMS::Array{T, 5},
+function countMutSensitivityEnsemble(DMS::Array{T, 5},
                                 tables::Tables,
                                 siteBeads::Vector{Int},
                                 normalizedThresh::Number;
@@ -97,16 +97,16 @@ function countMutSensitivityEns(DMS::Array{T, 5},
 end
 
 
-function computeStressEns(seqs::Vector{Vector{T}}, tables::Tables) where T <: Integer
+function computeStressEnsemble(seqs::Vector{Vector{T}}, tables::Tables) where T <: Integer
     return map( x -> computeStress(x, tables), seqs)
 end
 
-function computeBindingStressEns(seqs::Vector{Vector{T}}, ligands::Ligands, tables::Tables) where T <: Integer
+function computeBindingStressEnsemble(seqs::Vector{Vector{T}}, ligands::Ligands, tables::Tables) where T <: Integer
     return map( x -> computeBindingStress(x, ligands, tables), seqs)
 end
 
 
-function computeMaxOverlapEns(seqs::Vector{Vector{T}}, ligands::Ligands, tables::Tables) where T <: Integer
+function computeMaxOverlapEnsemble(seqs::Vector{Vector{T}}, ligands::Ligands, tables::Tables) where T <: Integer
     return map( x -> computeMaxOverlap(x, ligands, tables), seqs)
 end
 

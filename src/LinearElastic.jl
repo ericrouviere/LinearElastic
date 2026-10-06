@@ -109,13 +109,13 @@ export
     plotMutSensVsDist,
 
     # from ensemble.jl
-    evolveMCEns,
-    evolvePopEns,
-    computeBindingDMSEns,
-    countMutSensitivityEns,
-    computeStressEns,
-    computeMaxOverlapEns,
-    computeBindingStressEns,
+    evolveMCEnsemble,
+    evolvePopEnsemble,
+    computeBindingDMSEnsemble,
+    countMutSensitivityEnsemble,
+    computeStressEnsemble,
+    computeMaxOverlapEnsemble,
+    computeBindingStressEnsemble,
     convertPopulations2PopArray,
     convertPopArray2Populations
     
