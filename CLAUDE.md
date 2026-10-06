@@ -68,7 +68,7 @@ earlier "v15" model. Plotting uses PyPlot (matplotlib) and data uses JLD2. Julia
 
 ### Git
 - Only `src/`, `Project.toml`, `Manifest.toml`, `README`, `CLAUDE.md` and `.gitignore` are tracked. `exps/`, `notebooks/` and
-  `Rigidpy/` are git-ignored, so edits there cannot be committed. (They exist in the first commit, `1e0615b`.)
+  `Rigidpy/` are git-ignored, so edits there cannot be committed.
 - The environment is resolved for Julia 1.12 (`julia --project=.`). The newer JLD2 still loads the old experiment `.jld2` files.
 
 ### Unused code
