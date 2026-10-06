@@ -30,3 +30,6 @@
 
 # from evolve.jl (renamed to evolvePop, the seeded single-replicate runner as in SpinModel)
 #    evolvePop_seqsOnly,
+
+# from evolve.jl (replaced by copy-on-write selection)
+#    splitIntoUniqesAndRepeats,

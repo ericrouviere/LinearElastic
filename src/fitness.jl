@@ -40,6 +40,12 @@ abstract type Assay end
 "Binding to one ligand: `F0 - F1`. Needs 2 ligand states (solvent, ligand)."
 struct Binding <: Assay end
 
+"Binding to ligand 1, `F0 - F1`, from three ligand states (solvent, ligand 1, ligand 2)."
+struct Binding1 <: Assay end
+
+"Binding to ligand 2, `F0 - F2`, from three ligand states (solvent, ligand 1, ligand 2)."
+struct Binding2 <: Assay end
+
 """
 Simultaneous binding to two ligands, the generalist score `min(F0 - F1, F0 - F2)`.
 Needs 3 ligand states (solvent, ligand 1, ligand 2).
@@ -70,6 +76,16 @@ Fitness under `Binding` from the free energies `[F0, F1]`.
 computeFitness(::Binding, energies) = binding(energies...)
 
 """
+Fitness under `Binding1` from the free energies `[F0, F1, F2]`.
+"""
+computeFitness(::Binding1, energies) = binding(energies[1], energies[2])
+
+"""
+Fitness under `Binding2` from the free energies `[F0, F1, F2]`.
+"""
+computeFitness(::Binding2, energies) = binding(energies[1], energies[3])
+
+"""
 Fitness under `DoubleBinding` from the free energies `[F0, F1, F2]`.
 """
 computeFitness(::DoubleBinding, energies) = doubleBinding(energies...)
@@ -96,4 +112,28 @@ scoring function.
 function computeFitness(net::Network, ligands::Ligands, tables::Tables,
                         assay::Assay, β::Number)
     return computeFitness(assay, computeFreeEnergies(net, ligands, tables, β))
+end
+
+
+# Folding. A sequence folds into the network with free energy F (the solvent state,
+# λ0) or unfolds with free energy F_unfolded; in equilibrium between the two states
+# the folded fraction is a Fermi function of their difference.
+
+"""
+    foldedFraction(F, F_unfolded, β)
+
+Fraction of time a protein with folded free energy `F` is folded, in equilibrium with
+an unfolded state of free energy `F_unfolded`: `1 / (1 + exp(β (F - F_unfolded)))`.
+Close to 1 when `F` is well below `F_unfolded` and close to 0 when it is well above;
+exactly 1 for `F_unfolded = Inf`. Population evolution multiplies selection weights
+by it, so sequences that do not fold are strongly selected against.
+"""
+foldedFraction(F::Real, F_unfolded::Real, β::Real) = exp(logFoldedFraction(F, F_unfolded, β))
+
+"""
+Logarithm of `foldedFraction(F, F_unfolded, β)`, computed without overflow.
+"""
+function logFoldedFraction(F::Real, F_unfolded::Real, β::Real)
+    x = β * (F - F_unfolded)
+    return x > 0 ? -(x + log1p(exp(-x))) : -log1p(exp(x))
 end

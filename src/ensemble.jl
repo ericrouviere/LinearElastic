@@ -1,6 +1,25 @@
 
 """
-Evolve replicate MC trajectories.
+    withPool(f, pool)
+
+Call `f(pool)`. If `pool` is `nothing`, use a temporary `CachingPool` of all workers
+instead and clear it afterwards: a `CachingPool` sends the function (and the data it
+captures, such as `tables` and `ligands`) to each worker once, rather than with every
+task. Without added workers, `pmap` runs everything on the main process.
+"""
+function withPool(f, pool)
+    pool === nothing || return f(pool)
+    nprocs() == 1 && return f(default_worker_pool())
+    cachingPool = CachingPool(workers())
+    try
+        return f(cachingPool)
+    finally
+        clear!(cachingPool)
+    end
+end
+
+"""
+Evolve replicate MC trajectories, in parallel over the worker pool.
 """
 function evolveMCEnsemble(N_reps::Int,
                     ligands::Ligands,
@@ -8,26 +27,28 @@ function evolveMCEnsemble(N_reps::Int,
                     assay::Assay,
                     N_iter::Int, # Number of iterations
                     ζ::Real,
-                    β::Real)
+                    β::Real;
+                    pool=nothing)
     
     function kernel(x)
         net = buildRandNetwork(tables)
         times, fitnesses, networks = evolveMC(net, ligands, tables, assay, N_iter, ζ, β; Δt=0)
         return networks[end]
     end
-    return pmap( kernel, 1:N_reps)
+    return withPool(p -> pmap(kernel, p, 1:N_reps), pool)
 end
 
 
 """
-    evolvePopEnsemble(ligands, tables, β, evo, seeds; k_init_vec, N_seqs2Keep, pool)
+    evolvePopEnsemble(ligands, tables, β, evo, seeds; k_init_vec, N_seqs2Keep, F_unfolded=Inf, pool=nothing)
 
-Evolve one replicate population per entry of `seeds`, in parallel over the
-worker pool (serially when no workers have been added). Replicate `i` seeds its
-worker's RNG with `seeds[i]` and starts in environment `k_init_vec[i]`, so the
-ensemble is exactly reproducible from the saved `seeds` and `k_init_vec`
-regardless of how replicates are scheduled across workers. Pass
-`pool=CachingPool(workers())` to ship `ligands` and `tables` to each worker once.
+Evolve one replicate population per entry of `seeds` under fluctuating selection
+(`evolvePop`), in parallel over the worker pool (serially when no workers have been
+added). Replicate `i` seeds its worker's RNG with `seeds[i]` and starts in environment
+`k_init_vec[i]`, so the ensemble is exactly reproducible from the saved `seeds` and
+`k_init_vec` regardless of how replicates are scheduled across workers. Each task
+returns only its sampled sequences. Without a `pool`, a temporary `CachingPool` ships
+`ligands` and `tables` to each worker once (`withPool`).
 Returns `Vector{Vector{Vector{Int}}}` (replicate → sequence → beads).
 """
 function evolvePopEnsemble(ligands::Ligands,
@@ -37,27 +58,52 @@ function evolvePopEnsemble(ligands::Ligands,
                            seeds::AbstractVector{<:Integer};
                            k_init_vec=rand(1:(length(ligands.list)-1), length(seeds)),
                            N_seqs2Keep::Int=evo.P,
-                           pool::AbstractWorkerPool=default_worker_pool())
+                           F_unfolded::Real=Inf,
+                           pool=nothing)
     @assert length(seeds) == length(k_init_vec)
-    return pmap((s, k) -> evolvePop(ligands, tables, β, evo, s; k_init=k, N_seqs2Keep),
-                pool, seeds, k_init_vec)
+    return withPool(pool) do p
+        pmap((s, k) -> evolvePop(ligands, tables, β, evo, s; k_init=k, N_seqs2Keep, F_unfolded),
+             p, seeds, k_init_vec)
+    end
+end
+
+"""
+    evolvePopStaticEnsemble(ligands, tables, β, evo, assay, seeds; N_seqs2Keep, F_unfolded=Inf, pool=nothing)
+
+Static-selection counterpart of `evolvePopEnsemble`: one seeded replicate per entry of
+`seeds`, each evolved by `evolvePopStatic` on `assay`, in parallel over the worker pool.
+Returns `Vector{Vector{Vector{Int}}}` (replicate → sequence → beads).
+"""
+function evolvePopStaticEnsemble(ligands::Ligands,
+                                 tables::Tables,
+                                 β::Number,
+                                 evo::EvoParams,
+                                 assay::Assay,
+                                 seeds::AbstractVector{<:Integer};
+                                 N_seqs2Keep::Int=evo.P,
+                                 F_unfolded::Real=Inf,
+                                 pool=nothing)
+    return withPool(pool) do p
+        pmap(s -> evolvePopStatic(ligands, tables, β, evo, assay, s; N_seqs2Keep, F_unfolded), p, seeds)
+    end
 end
 
 
 """
-    computeBindingDMSEnsemble(seqsList, ligands, tables, β; pool)
+    computeBindingDMSEnsemble(seqsList, ligands, tables, β; pool=nothing)
 
 Deep mutational scan of every sequence in `seqsList` (replicate → sequence →
 beads), run as one flat `pmap` over all sequences. Returns
 `DMS[type, bead, lig, seq, rep]` (ΔΔF of every single mutant) and the binding
-energies `ΔF[lig, seq, rep]`. Pass `pool=CachingPool(workers())` to ship
-`ligands` and `tables` to each worker once.
+energies `ΔF[lig, seq, rep]`. Tasks are sent in batches (a few per worker) because
+one scan takes only milliseconds; without a `pool`, a temporary `CachingPool` ships
+`ligands` and `tables` to each worker once (`withPool`).
 """
 function computeBindingDMSEnsemble(seqsList::Vector{Vector{Vector{T}}},
                                    ligands::Ligands,
                                    tables::Tables,
                                    β::Number;
-                                   pool::AbstractWorkerPool=default_worker_pool()) where T <: Integer
+                                   pool=nothing) where T <: Integer
 
     function kernel(seq)
         net = buildNetwork(seq, tables)
@@ -71,7 +117,8 @@ function computeBindingDMSEnsemble(seqsList::Vector{Vector{Vector{T}}},
     N_types = size(tables.K, 1)
 
     seqsMat = [seqsList[i][j] for j in 1:P, i in 1:N_reps]
-    out = pmap(kernel, pool, seqsMat)
+    batch_size = max(1, length(seqsMat) ÷ (8 * nworkers()))
+    out = withPool(p -> pmap(kernel, p, seqsMat; batch_size), pool)
     DMS = Array{Float64, 5}(undef, N_types, N_beads, N_ligs, P, N_reps)
     ΔF = Array{Float64, 3}(undef, N_ligs, P, N_reps)
     for i in 1:N_reps, j in 1:P
@@ -162,9 +209,10 @@ end
 Largest normal-mode overlap of each sequence of each replicate (replicate → sequence →
 beads), computed in parallel with `pmap`; a `P × N_reps` matrix.
 """
-function computeMaxOverlapEnsemble(seqs::Vector{Vector{Vector{T}}}, ligands::Ligands, tables::Tables) where T <: Integer
+function computeMaxOverlapEnsemble(seqs::Vector{Vector{Vector{T}}}, ligands::Ligands, tables::Tables;
+                                   pool=nothing) where T <: Integer
     newseqs = hcat(seqs...)
-    return pmap( x -> computeMaxOverlap(vec(x), ligands, tables), newseqs)
+    return withPool(p -> pmap(x -> computeMaxOverlap(vec(x), ligands, tables), p, newseqs), pool)
 end
 
 

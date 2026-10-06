@@ -146,7 +146,8 @@ Build the `Network` of sequence `seq`, computing its energy parameters from scra
 """
 function buildNetwork(seq::Vector, tables::Tables)
     G, lpdH, h, c = getNetParams(seq, tables)
-    return Network(seq, G, similar(G), lpdH, 0.0, h, similar(h), c, 0.0)
+    u = G * h
+    return Network(seq, G, similar(G), lpdH, 0.0, h, similar(h), c, 0.0, u, dot(h, u))
 end
 
 """

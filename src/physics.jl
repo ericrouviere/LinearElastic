@@ -28,23 +28,17 @@ end
     computeFreeEnergy(net, per, tables, β)
 
 Free energy of `net` perturbed by `per` (e.g. a bound ligand), from a low-rank update
-of the cached parameters (`computePerturbedNetParams!`). Overwrites the scratch fields
-`net.δG` and `net.δh` with `G + δG` and `h + δh`.
+of the cached parameters (`perturbedFreeEnergy`). `net` is not modified.
 """
 function computeFreeEnergy(net::Network, per::Perturbation, tables::Tables, β)
-    computePerturbedNetParams!(net, per, tables)
-    # here I am using the allocated memory of δG and δh to store G+δG and h+δh.
-    net.δG .+= net.G
-    net.δh .+= net.h
-    return computeFreeEnergy(net.δG, net.lpdH+net.δlpdH, net.δh, net.c+net.δc, β)
+    return perturbedFreeEnergy(net, per.bonds, per.Δk, per.Δd, tables, β)
 end
 
 """
 Free energies of `net` in every state of `ligands`, solvent first.
 """
 function computeFreeEnergies(net::Network, ligands::Ligands, tables::Tables, β::Number)
-    # THIS CAN BE OPTIMIZEDF FOR <10% IMPROVEMENT. 
-    return computeFreeEnergy.([net], ligands.list, [tables], β) 
+    return [computeFreeEnergy(net, per, tables, β) for per in ligands.list]
 end
 
 
@@ -195,25 +189,25 @@ The tables must be symmetric (`checkTables`).
 function seq2NetParams(seq, tables::Tables)
     checkTables(tables)
     R, A, K, D, E = tables.R, tables.A, tables.K, tables.D, tables.E
-    N_beads = size(A,1)
-    N_bonds = Int(sum(A)/2)
-    T = makeBeads2BondsMatrix(A, R)
-    Γ = Diagonal(zeros(N_bonds)) # diagonal Stiffness matrix
-    M = Diagonal(zeros(N_bonds))
-    contactEnergy = 0.0 # sum of the contact energies of all bonds
-    l = 0
+    N_beads = size(A, 1)
+    H = zeros(2N_beads, 2N_beads)
+    h = zeros(2N_beads)
+    c = 0.0
+    # each bond adds k t t' to H, k d t to h and ½ k d² + ε to c, where t is its
+    # row of the beads-to-bonds matrix (nonzero on its two beads only)
     @inbounds for j in 1:N_beads-1, i in j+1:N_beads
         if A[i,j] == 1
-            l += 1
-            Γ[l,l] = K[seq[i], seq[j]]
-            M[l,l] = D[seq[i], seq[j]]
-            contactEnergy += E[seq[i], seq[j]]
+            k, d = K[seq[i], seq[j]], D[seq[i], seq[j]]
+            idx, t = _bondRow(R, i, j)
+            for p in 1:4
+                h[idx[p]] += k * d * t[p]
+                for r in 1:4
+                    H[idx[r], idx[p]] += k * t[r] * t[p]
+                end
+            end
+            c += k * d^2 / 2 + E[seq[i], seq[j]]
         end
     end
-    ones_vec = ones(N_bonds)
-    H = T'Γ*T
-    h = T'*(Γ*M)*ones_vec
-    c = 0.5*ones_vec'*(Γ*M*M)*ones_vec + contactEnergy
     return H, h, c
 end
 
@@ -256,6 +250,152 @@ function updateNetParams!(net::Network, tables::Tables)
     net.lpdH = lpdH
     net.h .= h
     net.c = c
+    mul!(net.u, net.G, net.h)
+    net.hGh = dot(net.h, net.u)
+    return nothing
+end
+
+# ----------------------------------------------------------------------------- 
+# Low-rank perturbations. A perturbation changes the stiffness (by Δk) and the
+# mismatch (by Δd) of m bonds, so it changes H by a rank-m term. These functions
+# use the Woodbury identity and the matrix determinant lemma on the cached G = H⁺,
+# u = G h and h'G h, touching only the 4 coordinates of each perturbed bond.
+
+"""
+Coordinates `(2i-1, 2i, 2j-1, 2j)` of bond `(i, j)` and its row of the beads-to-bonds
+matrix on them, `(nx, ny, -nx, -ny)`, with `(nx, ny)` from `computeBondVector`.
+"""
+@inline function _bondRow(R::AbstractVector, i::Integer, j::Integer)
+    nx, ny = computeBondVector(R, i, j)
+    return (2i-1, 2i, 2j-1, 2j), (nx, ny, -nx, -ny)
+end
+
+"""
+Coordinates and beads-to-bonds rows (`_bondRow`) of the perturbed `bonds`, and their
+current stiffness `k` and mismatch `d` in `net` (zero for a pair that is not bonded).
+"""
+function _perturbedBonds(net::Network, bonds, tables::Tables)
+    R, A, K, D, seq = tables.R, tables.A, tables.K, tables.D, net.seq
+    m = length(bonds)
+    idx = Vector{NTuple{4,Int}}(undef, m)
+    val = Vector{NTuple{4,Float64}}(undef, m)
+    k, d = zeros(m), zeros(m)
+    @inbounds for (a, (i, j)) in enumerate(bonds)
+        idx[a], val[a] = _bondRow(R, i, j)
+        if A[i, j] != 0
+            k[a], d[a] = K[seq[i], seq[j]], D[seq[i], seq[j]]
+        end
+    end
+    return idx, val, k, d
+end
+
+"Change of `½ k d²` when a bond's stiffness changes by `Δk` and its mismatch by `Δd`."
+_δc(k, d, Δk, Δd) = (k + Δk) * (d + Δd)^2 / 2 - k * d^2 / 2
+
+"""
+    perturbedFreeEnergy(net, bonds, Δk, Δd, tables, β)
+
+Free energy of `net` after changing the stiffness of each bond in `bonds` by `Δk` and
+its mismatch by `Δd`, without modifying `net`. With `T` the rows of the perturbed bonds,
+`S = T G T'`, the change of `h` is `T'v` with `v = (k + Δk)(d + Δd) - k d`, so
+
+    h'G h  →  hGh + 2 v'T u + v'S v - w'(Δ⁻¹ + S_nz)⁻¹ w,   w = (T u + S v)_nz,
+    log pdet H  →  lpdH + log det(I + Δ S_nz),
+
+over the bonds with `Δk ≠ 0` (`Δ = diag(Δk)`). Costs `O(m³)` for `m` bonds, independent
+of the size of the network.
+"""
+function perturbedFreeEnergy(net::Network, bonds, Δk, Δd, tables::Tables, β::Real)
+    G, u = net.G, net.u
+    idx, val, k, d = _perturbedBonds(net, bonds, tables)
+    m = length(bonds)
+    S = Matrix{Float64}(undef, m, m) # T G T'
+    Tu = zeros(m) # T u
+    v = zeros(m)
+    δc = 0.0
+    @inbounds for a in 1:m
+        for p in 1:4
+            Tu[a] += val[a][p] * u[idx[a][p]]
+        end
+        for b in a:m
+            s = 0.0
+            for p in 1:4, r in 1:4
+                s += val[a][p] * G[idx[a][p], idx[b][r]] * val[b][r]
+            end
+            S[a, b] = S[b, a] = s
+        end
+        v[a] = (k[a] + Δk[a]) * (d[a] + Δd[a]) - k[a] * d[a]
+        δc += _δc(k[a], d[a], Δk[a], Δd[a])
+    end
+    Sv = S * v
+    hGh = net.hGh + 2dot(v, Tu) + dot(v, Sv) # h'G h of the perturbed h, with the old G
+    δlpdH = 0.0
+    nz = findall(!iszero, Δk)
+    if !isempty(nz)
+        Δ = Δk[nz]
+        w = Tu[nz] .+ Sv[nz]
+        M = lu(I + Diagonal(Δ) * S[nz, nz]) # det(I + ΔS) = det(Δ) det(Δ⁻¹ + S)
+        δlpdH = log(det(M))
+        hGh -= dot(w, M \ (Δ .* w)) # (Δ⁻¹ + S)⁻¹ = (I + ΔS)⁻¹ Δ
+    end
+    n = length(net.h)
+    return net.c + δc - hGh / 2 - (n * log(2π / β) - (net.lpdH + δlpdH)) / (2β)
+end
+
+"""
+    mergePerturbations(bonds1, Δk1, Δd1, bonds2, Δk2, Δd2)
+
+One list of bond changes equivalent to applying both: changes to the same bond (in
+either bead order) add up. Returns `(bonds, Δk, Δd)`.
+"""
+function mergePerturbations(bonds1, Δk1, Δd1, bonds2, Δk2, Δd2)
+    bonds, Δk, Δd = collect(bonds1), collect(Float64, Δk1), collect(Float64, Δd1)
+    for (b, k, d) in zip(bonds2, Δk2, Δd2)
+        a = findfirst(x -> x == b || x == reverse(b), bonds)
+        if a === nothing
+            push!(bonds, b); push!(Δk, k); push!(Δd, d)
+        else
+            Δk[a] += k
+            Δd[a] += d
+        end
+    end
+    return bonds, Δk, Δd
+end
+
+"""
+    applyPerturbation!(net, bonds, Δk, Δd, tables)
+
+Change the stiffness of each bond in `bonds` by `Δk` and its mismatch by `Δd`, updating
+all cached parameters of `net` in place (`G`, `lpdH`, `h`, `c`, `u`, `hGh`). `G` gets the
+Woodbury correction `-Z (Δ⁻¹ + S)⁻¹ Z'` with `Z = G T'` over the bonds with `Δk ≠ 0`,
+a single rank-`m` BLAS update. Used to apply mutations.
+"""
+function applyPerturbation!(net::Network, bonds, Δk, Δd, tables::Tables)
+    G, h = net.G, net.h
+    idx, val, k, d = _perturbedBonds(net, bonds, tables)
+    nz = findall(!iszero, Δk)
+    if !isempty(nz)
+        Z = zeros(size(G, 1), length(nz)) # G T_nz'
+        @inbounds for (col, a) in enumerate(nz), p in 1:4
+            axpy!(val[a][p], view(G, :, idx[a][p]), view(Z, :, col))
+        end
+        S = [sum(val[a][p] * Z[idx[a][p], col] for p in 1:4) for a in nz, col in eachindex(nz)]
+        Δ = Δk[nz]
+        M = lu(I + Diagonal(Δ) * S)
+        net.lpdH += log(det(M))
+        W = M \ Matrix(Diagonal(Δ)) # (Δ⁻¹ + S)⁻¹
+        W = (W + W') / 2
+        mul!(G, Z, W * Z', -1.0, 1.0) # G - Z W Z'
+    end
+    @inbounds for a in eachindex(bonds)
+        v = (k[a] + Δk[a]) * (d[a] + Δd[a]) - k[a] * d[a]
+        for p in 1:4
+            h[idx[a][p]] += val[a][p] * v
+        end
+        net.c += _δc(k[a], d[a], Δk[a], Δd[a])
+    end
+    mul!(net.u, G, h)
+    net.hGh = dot(h, net.u)
     return nothing
 end
 

@@ -33,3 +33,25 @@
 #    end
 #    return w
 #end
+
+# Replaced by copy-on-write selection (applySelection! and mutateCopyOnWrite! in src/evolve.jl).
+#"""
+#Split `list` into its first occurrences `uniques` and its repeated occurrences
+#`repeats`, and return the positions `holes` in `1:length(list)` that are not in
+#`uniques`. `applySelection!` overwrites the networks at `holes` with the `repeats`.
+#"""
+#function splitIntoUniqesAndRepeats(list::Vector{T}) where T
+        
+#    uniques = eltype(list)[]
+#    repeats = eltype(list)[]
+#    #holes = Int[]
+#    for (i,el) in enumerate(list)
+#        if el in uniques
+#            push!(repeats, el)
+#        else
+#            push!(uniques, el)
+#        end
+#    end
+#    holes = setdiff(1:length(list), uniques)
+#    return uniques, repeats, holes
+#end

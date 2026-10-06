@@ -51,6 +51,9 @@ export
     computeBondVector,
     computeBondElongationMode,
     computePerturbedNetParams!,
+    perturbedFreeEnergy,
+    applyPerturbation!,
+    mergePerturbations,
     computePerturbedNetParams_old,
     pdetdiagm,
     computePerturbedGroundState,
@@ -65,22 +68,29 @@ export
     # from evolve.jl
     evolveMC,
     evolvePop!,
+    evolvePopStatic!,
+    evolvePopStatic,
     evolvePop,
     updateAllFitnesses!,
     fits2weights,
     applySelection!,
-    splitIntoUniqesAndRepeats,
+    mutateCopyOnWrite!,
 
     # from fitness.jl
     computeFitness,
+    foldedFraction,
+    logFoldedFraction,
     Assay,
     Binding,
+    Binding1,
+    Binding2,
     DoubleBinding,
     Allostery,
     TargetBinding,
 
     # from mutate.jl
     mutateBead!,
+    mutationPerturbation,
     mutateAtRate!,
 
     # from tools.jl
@@ -117,8 +127,10 @@ export
     plotMutSensVsDist,
 
     # from ensemble.jl
+    withPool,
     evolveMCEnsemble,
     evolvePopEnsemble,
+    evolvePopStaticEnsemble,
     computeBindingDMSEnsemble,
     countMutSensitivityEnsemble,
     computeStressEnsemble,

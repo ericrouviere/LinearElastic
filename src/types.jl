@@ -17,8 +17,9 @@ end
 """
 One evolving network: its sequence `seq` and the cached parameters of its quadratic
 energy `U(r) = ½ r'Hr - h'r + c`, namely `G = pinv(H)`, `lpdH = log pdet(H)`, `h` and
-`c`. The fields `δG`, `δlpdH`, `δh` and `δc` are scratch space for the change caused
-by a perturbation (`computePerturbedNetParams!`).
+`c`, together with the ground-state displacement `u = G h` and `hGh = h'G h`, which
+make perturbed free energies cheap (`perturbedFreeEnergy`). The fields `δG`, `δlpdH`,
+`δh` and `δc` are scratch space for `computePerturbedNetParams!`.
 """
 mutable struct Network
     seq::Vector{Int}
@@ -30,6 +31,8 @@ mutable struct Network
     δh::Vector{Float64}
     c::Float64
     δc::Float64
+    u::Vector{Float64} # ground-state displacement G h
+    hGh::Float64 # h'G h
 end
 
 """

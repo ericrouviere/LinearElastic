@@ -9,23 +9,23 @@ for the wild-type type). Returns an `N_types × N_beads × N_ligands` array; `ne
 not modified.
 """
 function computeBindingDMS(net::Network, ligands::Ligands, tables::Tables, β::Number)
-    net = deepcopy(net)
-    net_wt = deepcopy(net)
-    N_types = size(tables.K,1)
+    net = buildNetwork(copy(net.seq), tables) # parameters from scratch
+    ΔF_wt = computeBindingEnergies(net, ligands, tables, β)
+    N_types = size(tables.K, 1)
     N_beads = length(net.seq)
     N_ligs = length(ligands.list)
-    updateNetParams!(net, tables) # compute net params from scratch.
-    ΔF_wt = computeBindingEnergies(net, ligands, tables, β)
     DMS = zeros(N_types, N_beads, N_ligs-1)
-
-    for j in 1:N_beads
-        type_wt = net.seq[j]
-        for type_mut in 1:N_types
-            type_mut == type_wt && continue
-            mutateBead!(net, tables, j, type_mut)
-            ΔF = computeBindingEnergies(net, ligands, tables, β)
-            DMS[type_mut, j, :] = ΔF .- ΔF_wt
-            networkCopy!(net, net_wt)
+    F = zeros(N_ligs)
+    for j in 1:N_beads, type_mut in 1:N_types
+        type_mut == net.seq[j] && continue
+        # each mutant in each ligand state is one low-rank perturbation of the wild type
+        mbonds, mΔk, mΔd, _ = mutationPerturbation(net, tables, j, type_mut)
+        for (s, per) in enumerate(ligands.list)
+            bonds, Δk, Δd = mergePerturbations(mbonds, mΔk, mΔd, per.bonds, per.Δk, per.Δd)
+            F[s] = perturbedFreeEnergy(net, bonds, Δk, Δd, tables, β)
+        end
+        for l in 1:N_ligs-1
+            DMS[type_mut, j, l] = (F[l+1] - F[1]) - ΔF_wt[l]
         end
     end
     return DMS # an array of 3 dims

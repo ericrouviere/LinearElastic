@@ -18,8 +18,10 @@ function networkCopy!(net_des::Network, net_src::Network)
     copyto!(net_des.seq, net_src.seq)
     copyto!(net_des.G, net_src.G)
     copyto!(net_des.h, net_src.h)
+    copyto!(net_des.u, net_src.u)
     net_des.lpdH = net_src.lpdH
     net_des.c = net_src.c
+    net_des.hGh = net_src.hGh
     return nothing
 end
 

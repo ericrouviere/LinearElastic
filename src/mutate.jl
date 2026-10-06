@@ -8,34 +8,33 @@ function randNewType(numTypes, oldType)
 end
 
 """
-Mutate bead `mutatedBead` of `net` to type `newType` and update the cached energy
-parameters by a low-rank update over the bead's bonds (`computePerturbedNetParams!`),
-plus the change in the contact energy of those bonds.
+    mutationPerturbation(net, tables, mutatedBead, newType)
+
+Bonds of bead `mutatedBead` and the changes of their stiffness `Δk` and mismatch `Δd`
+if the bead were mutated to `newType`, plus the change `ΔE` of their contact energy.
+Returns `(bonds, Δk, Δd, ΔE)`; `net` is not modified.
 """
-function mutateBead!(net::Network, tables::Tables, mutatedBead::Int, newType::Integer)
-    A, R, K, D, E= tables.A, tables.R, tables.K, tables.D, tables.E
-    N_types = size(tables.K, 1)
+function mutationPerturbation(net::Network, tables::Tables, mutatedBead::Integer, newType::Integer)
+    A, K, D, E = tables.A, tables.K, tables.D, tables.E
     oldType = net.seq[mutatedBead]
-    #newType = randNewType(N_types, seq[mutatedBead]) # mutate sequence
-    connectedBeads = findall(x -> x!=0, A[:, mutatedBead]) # find beads connected to the mutated bead
-    bonds = [(mutatedBead, conBead) for conBead in connectedBeads]
-    N_m = length(connectedBeads)
-    Δk = zeros(N_m)
-    Δd = zeros(N_m)
-    ΔE = 0.0 # change in the contact energy of the mutated bead's bonds
-    for (i, bead_i) in enumerate(connectedBeads)
-        beadType_i = net.seq[bead_i]
-        Δk[i] = K[newType, beadType_i] - K[oldType, beadType_i]
-        Δd[i] = D[newType, beadType_i] - D[oldType, beadType_i]
-        ΔE += E[newType, beadType_i] - E[oldType, beadType_i]
-    end
-    mutation = Perturbation(bonds, Δk, Δd)
-    computePerturbedNetParams!(net, mutation, tables)
+    connectedBeads = findall(!iszero, view(A, :, mutatedBead))
+    bonds = [(mutatedBead, b) for b in connectedBeads]
+    Δk = [K[newType, net.seq[b]] - K[oldType, net.seq[b]] for b in connectedBeads]
+    Δd = [D[newType, net.seq[b]] - D[oldType, net.seq[b]] for b in connectedBeads]
+    ΔE = sum((E[newType, net.seq[b]] - E[oldType, net.seq[b]] for b in connectedBeads); init=0.0)
+    return bonds, Δk, Δd, ΔE
+end
+
+"""
+Mutate bead `mutatedBead` of `net` to type `newType` and update the cached energy
+parameters by a low-rank update over the bead's bonds (`applyPerturbation!`), plus
+the change in the contact energy of those bonds.
+"""
+function mutateBead!(net::Network, tables::Tables, mutatedBead::Integer, newType::Integer)
+    bonds, Δk, Δd, ΔE = mutationPerturbation(net, tables, mutatedBead, newType)
+    applyPerturbation!(net, bonds, Δk, Δd, tables)
     net.seq[mutatedBead] = newType
-    net.G .+= net.δG
-    net.h .+= net.δh
-    net.lpdH += net.δlpdH
-    net.c += net.δc + ΔE
+    net.c += ΔE
     return nothing
 end
 
