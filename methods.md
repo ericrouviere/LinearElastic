@@ -8,19 +8,19 @@ The model represents a protein as an elastic network of $N = 115$ nodes, standin
 
 ## Interactions
 
-Nodes $i$ and $j$ that are nearest neighbors on the undisplaced lattice are connected by a spring; we write $\langle ij \rangle$ for the $M = 304$ edges of the network. The spring between $i$ and $j$ has a stiffness $k_{ij}(s_i, s_j)$ and a rest-length mismatch $d_{ij}(s_i, s_j)$ that depend on the types of the two amino acids, read from two symmetric $q \times q$ tables. The values of $\ln k$ are drawn uniformly and rescaled to span $[\ln k_{\min}, \ln k_{\max}]$, with $k_{\min} = 10^{-2}$ and $k_{\max} = 10$, and the mismatches are drawn from a normal distribution with mean zero and standard deviation $\sigma_D = 0.1$. Both tables are fixed during evolution. A mismatch $d_{ij} > 0$ means that the spring prefers to be longer than in $\mathbf{R}^0$, so nonzero mismatches frustrate the network and create internal stress.
+Nodes $i$ and $j$ that are nearest neighbors on the undisplaced lattice are connected by a spring; we write $\langle ij \rangle$ for the $M = 304$ edges of the network. The spring between $i$ and $j$ has a stiffness $k_{ij}(s_i, s_j)$, a rest-length mismatch $d_{ij}(s_i, s_j)$ and a contact energy $\varepsilon_{ij}(s_i, s_j)$ that depend on the types of the two amino acids, read from three symmetric $q \times q$ tables. The values of $\ln k$ are drawn uniformly and rescaled to span $[\ln k_{\min}, \ln k_{\max}]$, with $k_{\min} = 10^{-2}$ and $k_{\max} = 10$, and the mismatches and contact energies are drawn from normal distributions with mean zero and standard deviations $\sigma_D = 0.1$ and $\sigma_\varepsilon$, respectively ($\sigma_\varepsilon = 0$ in the simulations reported here). All three tables are fixed during evolution. A mismatch $d_{ij} > 0$ means that the spring prefers to be longer than in $\mathbf{R}^0$, so nonzero mismatches frustrate the network and create internal stress. The contact energy is a direct interaction between the two amino acids that does not depend on the conformation; it contributes to the stability of a sequence but not to its mechanics.
 
 ## Energy landscape
 
 We treat the network in linear elasticity. For a displacement $\mathbf{u} \in \mathbb{R}^{2N}$ of the nodes from $\mathbf{R}^0$, the extension of spring $\langle ij \rangle$ is $\mathbf{t}_{ij} \cdot \mathbf{u}$, where $\mathbf{t}_{ij} \in \mathbb{R}^{2N}$ holds the unit vector $\hat{\mathbf{n}}_{ij}$ pointing from $j$ to $i$ at node $i$, $-\hat{\mathbf{n}}_{ij}$ at node $j$, and zeros elsewhere. Ligand binding is modeled by an additional spring of stiffness $\kappa$ between two active-site nodes $b_1$ and $b_2$, next-nearest neighbors in the interior of the network that are not otherwise connected, whose rest-length offset $\lambda$ is set by the ligand. The energy of the model is
 
-$$U(\mathbf{u}, \mathbf{s}, \lambda) = \sum_{\langle ij \rangle} \tfrac{1}{2} k_{ij}(s_i, s_j) \left(\mathbf{t}_{ij} \cdot \mathbf{u} - d_{ij}(s_i, s_j)\right)^2 + \tfrac{1}{2} \kappa \left(\mathbf{b} \cdot \mathbf{u} - \lambda\right)^2, \tag{1}$$
+$$U(\mathbf{u}, \mathbf{s}, \lambda) = \sum_{\langle ij \rangle} \left[ \tfrac{1}{2} k_{ij}(s_i, s_j) \left(\mathbf{t}_{ij} \cdot \mathbf{u} - d_{ij}(s_i, s_j)\right)^2 + \varepsilon_{ij}(s_i, s_j) \right] + \tfrac{1}{2} \kappa \left(\mathbf{b} \cdot \mathbf{u} - \lambda\right)^2, \tag{1}$$
 
 with $\mathbf{b} = \mathbf{t}_{b_1 b_2}$. The last term implements ligand binding. Different ligands are represented by different values of $\lambda$: $\lambda_1$ and $\lambda_2$ characterize the effects of two different ligands, and $\lambda_0$ represents the effect of the solvent interacting with the active site. To impose a binding trade-off, we choose ligand values that are opposite relative to the solvent condition, $\lambda_0 = 0$, $\lambda_1 = \delta$ and $\lambda_2 = -\delta$, with $\delta = 0.2$ and $\kappa = 1$: ligand 1 favors opening the active site and ligand 2 favors closing it. Expanding Eq. (1) gives the quadratic energy landscape
 
 $$U(\mathbf{u}, \mathbf{s}, \lambda) = \tfrac{1}{2} \mathbf{u}^\top H(\mathbf{s})\, \mathbf{u} - \mathbf{h}(\mathbf{s}, \lambda)^\top \mathbf{u} + c(\mathbf{s}, \lambda), \tag{2}$$
 
-$$H = \sum_{\langle ij \rangle} k_{ij} \mathbf{t}_{ij} \mathbf{t}_{ij}^\top + \kappa \mathbf{b} \mathbf{b}^\top, \qquad \mathbf{h} = \sum_{\langle ij \rangle} k_{ij} d_{ij} \mathbf{t}_{ij} + \kappa \lambda \mathbf{b}, \qquad c = \tfrac{1}{2} \sum_{\langle ij \rangle} k_{ij} d_{ij}^2 + \tfrac{1}{2} \kappa \lambda^2. \tag{3}$$
+$$H = \sum_{\langle ij \rangle} k_{ij} \mathbf{t}_{ij} \mathbf{t}_{ij}^\top + \kappa \mathbf{b} \mathbf{b}^\top, \qquad \mathbf{h} = \sum_{\langle ij \rangle} k_{ij} d_{ij} \mathbf{t}_{ij} + \kappa \lambda \mathbf{b}, \qquad c = \sum_{\langle ij \rangle} \left( \tfrac{1}{2} k_{ij} d_{ij}^2 + \varepsilon_{ij} \right) + \tfrac{1}{2} \kappa \lambda^2. \tag{3}$$
 
 The Hessian $H$ depends on the sequence but not on the ligand. It has three zero modes, two translations and a rotation, which are orthogonal to $\mathbf{h}$. We write $C = H^{+}$ for its pseudoinverse, the compliance matrix, and $\mathrm{Det}'$ for the product of its nonzero eigenvalues.
 
@@ -38,7 +38,7 @@ The binding free energy is the difference in free energy between ligand-bound an
 
 $$\Delta F_k(\mathbf{s}) = F(\mathbf{s}, \lambda_k) - F(\mathbf{s}, \lambda_0), \qquad k = 1, 2. \tag{5}$$
 
-Because the ligand changes $\mathbf{h}$ and $c$ but not $H$, the fluctuation term cancels, and Eq. (4) gives
+Because the ligand changes $\mathbf{h}$ and $c$ but not $H$ or the sequence, the fluctuation term and the contact energies cancel, and Eq. (4) gives
 
 $$\Delta F_k(\mathbf{s}) = \tfrac{1}{2} \kappa \left(1 - \kappa \chi\right) \lambda_k^2 - \kappa \lambda_k e_0, \qquad e_0 = \mathbf{b}^\top C\, \mathbf{h}(\mathbf{s}, \lambda_0), \quad \chi = \mathbf{b}^\top C\, \mathbf{b}. \tag{6}$$
 
@@ -64,6 +64,7 @@ We simulated the evolution of a population of fixed size $P = 100$ using Wrightâ
 | $q$ | amino acid types | 5 |
 | $k_{\min}$, $k_{\max}$ | range of spring stiffnesses | $10^{-2}$, $10$ |
 | $\sigma_D$ | spread of rest-length mismatches | 0.1 |
+| $\sigma_\varepsilon$ | spread of contact energies | 0 |
 | $\kappa$ | ligand spring stiffness | 1 |
 | $\lambda_0, \lambda_1, \lambda_2$ | solvent and ligand rest-length offsets | $0, 0.2, -0.2$ |
 | $\beta$ | inverse temperature | 1 |

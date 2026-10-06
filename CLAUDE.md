@@ -73,7 +73,7 @@ julia --project=. test/test_evolve.jl    # assays, fitness map, seeded/parallel 
 
 | Type | Role |
 |------|------|
-| `Tables` | Fixed for an experiment: bead positions `R = [x1,y1,x2,y2,...]`, adjacency `A`, stiffness table `K`, mismatch table `D`, contact table `E` (unused) |
+| `Tables` | Fixed for an experiment: bead positions `R = [x1,y1,x2,y2,...]`, adjacency `A`, stiffness table `K`, mismatch table `D`, contact-energy table `E` (each bond adds `E[s_i,s_j]` to `c`; cancels in binding energies). All three must be symmetric (`checkTables`); to use chosen values, build `Tables(t.R, t.A, t.K, t.D, E)` |
 | `Network` | One evolving sequence and its cached energy parameters (of `U = ½ r'Hr − h'r + c`) `G = pinv(H)`, `lpdH = log pdet(H)`, `h`, `c`. The `δ*` fields are scratch buffers |
 | `Perturbation` | `bonds`, `Δk`, `Δd`: changes in stiffness and rest-length mismatch of a set of bonds. Used for ligands and mutations |
 | `Ligands` | `list::Vector{Perturbation}`; `list[1]` is the solvent, `list[2]`, `list[3]` the two environments |
