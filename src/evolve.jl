@@ -48,15 +48,13 @@ function evolvePop!(nets::Vector{Network}, # population of networks
                     ligands::Ligands,
                     tables::Tables,
                     β::Number, # Physical Temp
-                    N_gen::Int, # number of generations
-                    μ::Number, # mutation rate
-                    τ::Int, # enviromental timescale
-                    α::Number; # selection strength
+                    evo::EvoParams;
                     k_init::Int=1, # Initial enviroment
                     sampleLastHalf::Bool=true, # if true sample last half, if false return final
                     N_seqs2Keep::Int=length(nets))
 
     # Evolve a popluation of sequences under a fluctuating selection
+    N_gen, μ, τ, α = evo.N, evo.μ, evo.τ, evo.α
     N_env = length(ligands.list) - 1
     @assert N_env == 2 # this is temporary
     @assert iseven(N_gen) 
@@ -101,23 +99,19 @@ function evolvePop!(nets::Vector{Network}, # population of networks
 end
 
 
-function evolvePop_seqsOnly(P::Integer, # population size
-                   ligands::Ligands,
+function evolvePop_seqsOnly(ligands::Ligands,
                    tables::Tables,
                    β::Number, # Physical Temp
-                   N_gen::Int, # number of generations
-                   μ::Number, # mutation rate
-                   τ::Int, # enviromental timescale
-                   α::Number, # selection strength
+                   evo::EvoParams,
                    seed::UInt; # set the seed
                    k_init::Int=1, # Initial enviroment
                    sampleLastHalf::Bool=true, # if true sample last half, if false return final
-                   N_seqs2Keep::Int=P) 
+                   N_seqs2Keep::Int=evo.P) 
     # generate population of networks and evolve it
     # return only a vector or sequences
     Random.seed!(seed)
-    nets = [buildRandNetwork(tables) for i in 1:P]
-    fitBucket, netBucket = evolvePop!(nets, ligands, tables, β, N_gen, μ, τ, α; k_init, sampleLastHalf, N_seqs2Keep);
+    nets = [buildRandNetwork(tables) for i in 1:evo.P]
+    fitBucket, netBucket = evolvePop!(nets, ligands, tables, β, evo; k_init, sampleLastHalf, N_seqs2Keep);
     return map(x -> x.seq, netBucket) # return only the sequences. 
 end
 

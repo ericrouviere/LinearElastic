@@ -29,6 +29,7 @@ export
     Network,
     Perturbation,
     Ligands,
+    EvoParams,
 
     # from buildnetwork.jl
     buildStructure,
@@ -83,6 +84,7 @@ export
 
     # from tools.jl
     networkCopy!,
+    convertEvoParams,
 
     # from analysis.jl
     computeBindingDMS,

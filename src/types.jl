@@ -31,3 +31,12 @@ end
 struct Ligands
     list::Vector{Perturbation}
 end
+
+mutable struct EvoParams
+    # Parameters of the evolutionary process.
+    P::Int # population size
+    N::Int # number of generations
+    μ::Float64 # mutation rate per site per generation
+    τ::Int # environmental timescale
+    α::Float64 # selection strength
+end

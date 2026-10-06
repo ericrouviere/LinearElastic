@@ -1,3 +1,12 @@
+"""
+    convertEvoParams(S::Dict)
+
+Build an `EvoParams` from a settings dict with keys "P", "N", "μ", "τ" and "α".
+"""
+function convertEvoParams(S::Dict)
+    return EvoParams(S["P"], S["N"], Float64(S["μ"]), S["τ"], Float64(S["α"]))
+end
+
 # convert between postions as a vector r = [x1,y1,x2,y2,...]
 # to position as a matrix xy = [x1 y1; x1 y1;..]
 
