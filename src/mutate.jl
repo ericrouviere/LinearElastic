@@ -1,12 +1,17 @@
 
+"""
+Random bead type different from `oldType`, uniform over the other `numTypes - 1` types.
+"""
 function randNewType(numTypes, oldType)
     a = rand( 1:(numTypes-1) )
     return  ((oldType-1 + a) % numTypes) +1 # new type
 end
 
+"""
+Mutate bead `mutatedBead` of `net` to type `newType` and update the cached energy
+parameters by a low-rank update over the bead's bonds (`computePerturbedNetParams!`).
+"""
 function mutateBead!(net::Network, tables::Tables, mutatedBead::Int, newType::Integer)
-    # Mutate sequence at position `mutatedBead` with a bead of newType.
-    # update the quadratic energy params.
     A, R, K, D, E= tables.A, tables.R, tables.K, tables.D, tables.E
     N_types = size(tables.K, 1)
     oldType = net.seq[mutatedBead]
@@ -31,25 +36,31 @@ function mutateBead!(net::Network, tables::Tables, mutatedBead::Int, newType::In
     return nothing
 end
 
+"""
+Mutate bead `mutatedBead` of `net` to a random different type.
+"""
 function mutateBead!(net::Network, tables::Tables, mutatedBead::Int)
-    # Mutate sequence at position `mutatedBead` with random new bead type.
-    # update the quadratic energy params.
     N_types = size(tables.K, 1)
     newType = randNewType(N_types, net.seq[mutatedBead]) # mutate sequence
     mutateBead!(net, tables, mutatedBead, newType)
     return nothing
 end
 
+"""
+Mutate a random bead of `net` to a random different type.
+"""
 function mutateBead!(net::Network, tables::Tables)
-    # Mutate sequence at random position , update the quadratic energy params
     N_beads = length(net.seq)
     mutateBead!(net, tables, rand(1:N_beads))
     return nothing
 end
 
 
+"""
+Mutate each bead of `net` independently with probability `μ`. Returns `true` if any
+bead was mutated.
+"""
 function mutateAtRate!(net::Network, μ::Number, tables::Tables)
-    # Mutate each position of sequence with probability μ.
     didMutate = false
     N_types = size(tables.K, 1)
     for i in eachindex(net.seq)

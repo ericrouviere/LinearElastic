@@ -1,7 +1,14 @@
 
 
+"""
+    computeBindingDMS(net, ligands, tables, β)
+
+Deep mutational scan of the binding energies of `net`. `DMS[t, j, k]` is the change
+`ΔΔF` in the binding energy to ligand `k` when bead `j` is mutated to type `t` (zero
+for the wild-type type). Returns an `N_types × N_beads × N_ligands` array; `net` is
+not modified.
+"""
 function computeBindingDMS(net::Network, ligands::Ligands, tables::Tables, β::Number)
-    # compute deep mutational scan assying for binding.
     net = deepcopy(net)
     net_wt = deepcopy(net)
     N_types = size(tables.K,1)
@@ -24,6 +31,12 @@ function computeBindingDMS(net::Network, ligands::Ligands, tables::Tables, β::N
     return DMS # an array of 3 dims
 end
 
+"""
+Double mutational scan of the binding energies of `net`. Returns `S, D`: the
+single-mutant `ΔΔF` (as `computeBindingDMS`) and `D[t1, j1, t2, j2, k]`, the `ΔΔF` to
+ligand `k` of the double mutant (bead `j1` to type `t1`, bead `j2` to type `t2`),
+symmetric in the two mutations.
+"""
 function computeBindingDCS(net::Network, ligands::Ligands, tables::Tables, β::Number)
     net = deepcopy(net)
     net_wt = deepcopy(net)
@@ -66,18 +79,25 @@ function computeBindingDCS(net::Network, ligands::Ligands, tables::Tables, β::N
 end
 
 
+"""
+    countMutSensitivity(dms, stepsVec, normalizedThresh; scale=0.0)
+
+Mutational-sensitivity statistics of one deep mutational scan `dms`
+(`N_types × N_beads × N_ligands`). A mutation is sensitive if the norm of its `ΔΔF`
+over the ligands exceeds `normalizedThresh * scale`; `scale = 0` uses the mean `|ΔΔF|`
+of mutations within one bond of the binding site. `stepsVec[j]` is the number of
+bonds between bead `j` and the binding site.
+
+Returns `(N_sensMuts, N_sensPos, evolvability, maxDist, scale)`: the number of
+sensitive mutations, the number of positions with at least one, the root-mean-square
+norm of `ΔΔF` over all single mutants (the evolvability), the largest distance of a
+sensitive mutation from the binding site, and the scale used.
+"""
 function countMutSensitivity(dms::AbstractArray{T,3},
                              stepsVec::Vector,
                              normalizedThresh::Number; # sensitivity threshold relative to `scale`. eg 10%.
                              scale::Number=0.0 # use 0.0 for relative scale
                              ) where T <: Number
-                             # W=5, actSiteLayer=11) where T <: AbstractFloat
-    # 1. count the number of mutatant that change free energy by at least x.
-    # 2. count the number of positions that have at least 1 mutation that 
-    # changes fitness by at least x.
-    # 3. Measure the distance between the active site and the fartest mutation
-    # that changes energies by at least x.
-    # W is the number sites in a single layer, ie width of lattice.
     N_types, N_beads, N_ligs = size(dms)
 
     if scale==0.0 # use active site mutations for scale
@@ -109,6 +129,10 @@ function countMutSensitivity(dms::AbstractArray{T,3},
 end
 
 
+"""
+Same as `countMutSensitivity(dms, stepsVec, normalizedThresh)`, with the distances
+computed from the binding-site beads `siteBeads` and the adjacency matrix `adjMat`.
+"""
 function countMutSensitivity(dms::AbstractArray{T,3},
                              siteBeads::Vector,
                              adjMat::Matrix,
@@ -120,10 +144,11 @@ function countMutSensitivity(dms::AbstractArray{T,3},
 end
 
 
+"""
+Matrix of graph distances (number of bonds) between every pair of beads of the network
+with adjacency matrix `A`.
+"""
 function getStepsMat(A::Matrix{T}) where T<:Number
-    # return a matrix who entries are the number of steps to
-    # go from bead i to node j.
-    # arg A is the adjacency matrix of the network.
     full, i = false, 0
     B = similar(A)
     bucket = BitMatrix[]
@@ -139,17 +164,20 @@ function getStepsMat(A::Matrix{T}) where T<:Number
     return C
 end
 
+"""
+Graph distance from each bead to the nearest bead in `siteBeads` (the binding site).
+"""
 function getStepsVector(A::Matrix, siteBeads::AbstractVector)
-    # returns a vector whose entries are the number of steps
-    # from the active site to each node.
     stepsMat = getStepsMat(A)
     X = stepsMat[:,siteBeads]
     return vec(minimum(X, dims=2))
 end
 
+"""
+Beads of the binding site: the beads of the bonds perturbed by the first ligand state.
+All states are assumed to act on the same bonds.
+"""
 function getSiteBeads(ligands::Ligands)
-    # assumes that all perturbations in ligands opporate on
-    # the same bonds.
     return unique(vcat(collect.(ligands.list[1].bonds)...))
 end
 
@@ -216,6 +244,11 @@ function compareSeqWithSameBinding(ΔF_target::Vector,
     return bool, answers
 end
 
+"""
+Run `compareSeqWithSameBinding` for each pair of target binding energies and DMS, and
+return the relative differences `(dnm, dnp, de, dmd)` of the comparisons that found a
+reference sequence.
+"""
 function compareSeqWithSameBinding(ΔF_target_vec::Vector{Vector{T}},
                                    dms_vec::Vector{Array{T, 3}},
                                    ligands::Ligands,
@@ -296,6 +329,11 @@ function computeConfChange(net::Network, ligands::Ligands, tables::Tables)
     return ΔR = GS[:,2:end] .- GS[:,1];
 end
 
+"""
+Overlaps of the normalized ligand-induced conformational changes (`computeConfChange`)
+with the eigenvectors of `G = pinv(H)`, the network's normal modes. One column per
+ligand.
+"""
 function computeOverlaps(net::Network, ligands::Ligands, tables::Tables)
     ΔR = computeConfChange(net::Network, ligands::Ligands, tables::Tables)
     ΔR .= ΔR ./ reshape(norm.(eachcol(ΔR)), 1, :)
@@ -303,10 +341,17 @@ function computeOverlaps(net::Network, ligands::Ligands, tables::Tables)
     return eig.vectors'ΔR
 end
 
+"""
+Same as `computeOverlaps(net, ligands, tables)`, for the network of sequence `seq`.
+"""
 function computeOverlaps(seq::Vector, ligands::Ligands, tables::Tables)
     return computeOverlaps(buildNetwork(seq, tables), ligands, tables)
 end
 
+"""
+Largest absolute overlap of a ligand-induced conformational change with a normal mode
+of the network of `seq`.
+"""
 computeMaxOverlap(seq::Vector, ligands::Ligands, tables::Tables) = maximum(abs, computeOverlaps(seq, ligands, tables))
 
 

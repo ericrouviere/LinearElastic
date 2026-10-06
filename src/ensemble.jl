@@ -81,6 +81,10 @@ function computeBindingDMSEnsemble(seqsList::Vector{Vector{Vector{T}}},
 end
 
 
+"""
+Apply `countMutSensitivity` to every sequence of an ensemble scan
+`DMS[type, bead, lig, seq, rep]`. Returns the five statistics as `P × N_reps` matrices.
+"""
 function countMutSensitivityEnsemble(DMS::Array{T, 5},
                                 tables::Tables,
                                 siteBeads::Vector{Int},
@@ -108,9 +112,17 @@ function countMutSensitivityEnsemble(DMS::Array{T, 5},
 end
 
 
+"""
+Stress `|h|` (`computeStress`) of each sequence in `seqs`.
+"""
 function computeStressEnsemble(seqs::Vector{Vector{T}}, tables::Tables) where T <: Integer
     return map( x -> computeStress(x, tables), seqs)
 end
+
+"""
+Stress `|h|` of each sequence of each replicate (replicate → sequence → beads), as a
+`P × N_reps` matrix.
+"""
 function computeStressEnsemble(seqs::Vector{Vector{Vector{T}}}, tables::Tables) where T <: Integer
     stress = zeros(length(seqs[1]), length(seqs))
     for j in axes(stress, 2), i in axes(stress, 1)
@@ -119,9 +131,17 @@ function computeStressEnsemble(seqs::Vector{Vector{Vector{T}}}, tables::Tables) 
     return stress
 end
 
+"""
+Binding stress `|h ⋅ b|` (`computeBindingStress`) of each sequence in `seqs`.
+"""
 function computeBindingStressEnsemble(seqs::Vector{Vector{T}}, ligands::Ligands, tables::Tables) where T <: Integer
     return map( x -> computeBindingStress(x, ligands, tables), seqs)
 end
+
+"""
+Binding stress `|h ⋅ b|` of each sequence of each replicate (replicate → sequence →
+beads), as a `P × N_reps` matrix.
+"""
 function computeBindingStressEnsemble(seqs::Vector{Vector{Vector{T}}}, ligands::Ligands, tables::Tables) where T <: Integer
     stress = zeros(length(seqs[1]), length(seqs))
     for j in axes(stress, 2), i in axes(stress, 1)
@@ -131,9 +151,17 @@ function computeBindingStressEnsemble(seqs::Vector{Vector{Vector{T}}}, ligands::
 end
 
 
+"""
+Largest normal-mode overlap (`computeMaxOverlap`) of each sequence in `seqs`.
+"""
 function computeMaxOverlapEnsemble(seqs::Vector{Vector{T}}, ligands::Ligands, tables::Tables) where T <: Integer
     return map( x -> computeMaxOverlap(x, ligands, tables), seqs)
 end
+
+"""
+Largest normal-mode overlap of each sequence of each replicate (replicate → sequence →
+beads), computed in parallel with `pmap`; a `P × N_reps` matrix.
+"""
 function computeMaxOverlapEnsemble(seqs::Vector{Vector{Vector{T}}}, ligands::Ligands, tables::Tables) where T <: Integer
     newseqs = hcat(seqs...)
     return pmap( x -> computeMaxOverlap(vec(x), ligands, tables), newseqs)
@@ -144,6 +172,10 @@ end
 ##### Ensemble Helper functions ##############################
 ##############################################################3
 
+"""
+Pack populations (replicate → sequence → beads) into an `Int8` array
+`(N_beads, P, N_reps)` for saving.
+"""
 function convertPopulations2PopArray(populations::Vector{Vector{Vector{T}}}) where T<: Integer
 
     N_reps = length(populations)
@@ -156,6 +188,10 @@ function convertPopulations2PopArray(populations::Vector{Vector{Vector{T}}}) whe
     return popArray
 end
 
+"""
+Unpack an `Int8` population array `(N_beads, P, N_reps)` into replicate → sequence →
+beads vectors of `Int`.
+"""
 function convertPopArray2Populations(popArray::Array{Int8, 3})
     return [ Vector{Int}[ eachcol(popArray[:,:,i])... ]  for i in 1:size(popArray, 3) ]
     #return [eachcol( popArray[:,:,i])...]

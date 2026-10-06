@@ -1,7 +1,13 @@
 
+"""
+    buildStructure(W, L, offset)
+
+Bead positions and adjacency matrix of a triangular lattice `W` beads wide and `L`
+layers long (`L` must be odd). Beads less than 1.1 lattice spacings apart are bonded;
+then every coordinate is displaced by Gaussian noise of standard deviation `offset`.
+Returns `R = [x1, y1, x2, y2, ...]` and the adjacency matrix `A`.
+"""
 function buildStructure(W::Int, L::Int, offset::Number)
-    # return a structure `r` and Adacency matrix `A` 
-    # offset controlles how much points are perturbed of tri lattice.    
     @assert isodd(L)
     numLayers = Int((L-1)/2)
     stride = 2W-1
@@ -42,10 +48,15 @@ function buildStructure(W::Int, L::Int, offset::Number)
 end
 
 
+"""
+    buildSpringTable(N_types, k_min, k_max; binary=false, N_soft=0)
+
+Symmetric `N_types × N_types` table of bond stiffnesses: `K[a, b]` is the spring
+constant of a bond between beads of types `a` and `b`. Entries are log-uniform and
+rescaled to span exactly `[k_min, k_max]`. With `binary=true`, all entries are `k_max`
+except `N_soft` random entries set to `k_min`.
+"""
 function buildSpringTable(N_types::Int, k_min::Number, k_max::Number; binary=false, N_soft=0)
-    # generate a Matrix K_ij where i and j are nodes types and
-    # and K_ij is the spring constant that connect nodes of type i
-    # and type j.
 
     if binary # make all but N_soft entries stiff
         K = k_max*ones(N_types,N_types)
@@ -72,19 +83,31 @@ function buildSpringTable(N_types::Int, k_min::Number, k_max::Number; binary=fal
     return K
 end
 
+"""
+Symmetric table of contact energies between bead types, Gaussian with standard
+deviation `energyVar` (not used by the energy model).
+"""
 function buildContactEnergyTable(N_types::Int, energyVar::Number)
-    # Generate a Matrix E_ij where i and j are bead types and
-    # and E_ij is the contact energy that connect nodes of type i and j
     return Float64.(Symmetric( energyVar*randn(N_types, N_types) ))
 end
 
+"""
+Symmetric table `D[a, b]` of the rest-length mismatch of a bond between beads of
+types `a` and `b`, Gaussian with standard deviation `mismatchVar`.
+"""
 function buildMismatchTable(N_types::Int, mismatchVar::Number)
-    # Generate a Matrix D_ij where i and j are bead types and
-    # and D_ij is the contact energy that connect nodes of type i and j
     return Float64.(Symmetric( mismatchVar*randn(N_types, N_types) ))
 end
 
 
+"""
+    makeTables(W, L, offset, N_types, k_min, k_max, energyVar, mismatchVar; binary=false, N_soft=0)
+
+Build the `Tables` of an experiment: a perturbed `W × L` triangular lattice
+(`buildStructure`) and random bead-type tables of stiffness (`buildSpringTable`),
+mismatch (`buildMismatchTable`) and contact energy (`buildContactEnergyTable`).
+Draws from the global RNG; seed it first for a reproducible network.
+"""
 function makeTables(W::Int,
                    L::Int,
                    offset::Number,
@@ -95,7 +118,6 @@ function makeTables(W::Int,
                    mismatchVar::Number;
                    binary=false,
                    N_soft=0)
-    # make a table object.
     R, A = buildStructure(W, L, offset)
     K = buildSpringTable(N_types, k_min, k_max; binary, N_soft)
     D = buildMismatchTable(N_types, mismatchVar)
@@ -103,20 +125,28 @@ function makeTables(W::Int,
     return Tables(R, A, K, D, E)
 end
 
+"""
+Uniformly random sequence of bead types: one type in `1:size(K, 1)` for each bead
+of the positions `R`.
+"""
 function randSeq(R, K)
-    # generate a random sequence of node types.
     N_beads = Int(length(R)/2)
     N_types = size(K, 1)
     seq = rand(1:N_types, N_beads)
     return seq
 end
 
+"""
+Build the `Network` of sequence `seq`, computing its energy parameters from scratch.
+"""
 function buildNetwork(seq::Vector, tables::Tables)
-    # return an updated network struct
     G, lpdH, h, c = getNetParams(seq, tables)
     return Network(seq, G, similar(G), lpdH, 0.0, h, similar(h), c, 0.0)
 end
 
+"""
+Build the `Network` of a uniformly random sequence.
+"""
 function buildRandNetwork(tables::Tables)
     seq = randSeq(tables.R, tables.K)
     return buildNetwork(seq, tables)

@@ -1,9 +1,11 @@
+"""
+Draw the network with bead positions `r` and adjacency matrix `adjacencyMatrix` on the
+axis `ax`.
+"""
 function plotNetwork!(ax, r::Vector, adjacencyMatrix::Matrix;
                       bondColor::Vector=[0.7,0.7,0.7],
                       bondWidth=3,
                       nodeSize=30)
-    # Plots network, modifies figure axis object in place
-    # uses PyPlot, LinearAlgebra
     #xy = r2xy(r)
     xy = reshape(r, 2, :)'
     x = xy[:,1]
@@ -25,6 +27,9 @@ function plotNetwork!(ax, r::Vector, adjacencyMatrix::Matrix;
 end
 
 
+"""
+Draw the displacement `dr` of each bead at positions `r` as arrows on `ax`.
+"""
 function plotDisplacement!(ax, r, dr; zorder=1,
                          width=0.004, color="r", angles="xy", scale_units="xy", scale=0.5)
     xy = reshape(r, 2, :)'
@@ -37,6 +42,10 @@ function plotDisplacement!(ax, r, dr; zorder=1,
     return nothing
 end
 
+"""
+Draw the network on `ax` with bond `(i, j)` colored by `bondColorMat[i, j]` (between 0
+and 1) through the colormap `cmap`, and add a colorbar. Returns the colorbar.
+"""
 function plotNetworkColoredBonds!(ax, fig, R::Vector,
                                   A::Matrix,
                                   bondColorMat::Matrix;
@@ -44,8 +53,6 @@ function plotNetworkColoredBonds!(ax, fig, R::Vector,
                                   nodeSize=30,
                                   cmap="Purples")
 
-    # plot a network, with the bond painted according to bondColorMat.
-    # the floats in bondColorMat should be between 0 and 1.
     cm = get_cmap(cmap)
     #xy = r2xy(r)
     xy = reshape(R, 2, :)'
@@ -65,6 +72,10 @@ function plotNetworkColoredBonds!(ax, fig, R::Vector,
 end
 
 
+"""
+Draw the network on `ax` with each bond colored by the `log10` of its stiffness in
+`SM`, scaled between `k_min` and `k_max` (themselves `log10` values).
+"""
 function plotBondStiffness!(ax, fig, net::Network, tables::Tables, SM::Matrix;
         bondWidth=3, nodeSize=30, cmap="Purples",
         k_max = log(10, maximum(tables.K)),
@@ -92,6 +103,10 @@ function plotBondStiffness!(ax, fig, net::Network, tables::Tables, SM::Matrix;
 end
 
 
+"""
+Draw the network of `net` on `ax` with each bond colored by its stiffness
+`K[seq[i], seq[j]]`.
+"""
 function plotBondStiffness!(ax, fig,
                             net::Network,
                             tables::Tables,
@@ -113,6 +128,10 @@ function plotBondStiffness!(ax, fig,
 end
 
 
+"""
+Add a colorbar of the colormap `cmap` over `colorRange` to the right of `ax`, without
+resizing `ax` and without a mappable object. Returns the colorbar.
+"""
 function addCustomColorBar!(ax::PyObject,
                             fig::Figure;
                             cmap="inferno",
@@ -120,10 +139,6 @@ function addCustomColorBar!(ax::PyObject,
                             width=1,
                             height=0.8)
 
-    # add a colobar for a figure without changing the size of the axes
-    # and without needing a mappable object. Use this function when
-    # you know the smallest and largest values that will be colored
-    # and 
 
     norm = matplotlib.colors.Normalize(vmin=colorRange[1], vmax=colorRange[2]) 
     sm = matplotlib.cm.ScalarMappable(cmap=get_cmap(cmap), norm=norm)
@@ -275,6 +290,10 @@ function plotDMS(dms::Array{T,3}) where T <: Number
     return fig  # Return figure and axes for further customization
 end
 
+"""
+Scatter `log10 |ΔΔF|` of every mutation in `dms` against the distance of its bead from
+the binding site `siteBeads`, on `ax`.
+"""
 function plotMutSensVsDist!(ax, dms::Array{T,3}, siteBeads::Vector, tables::Tables; color="k") where T <: Number
     dmss = abs.(vcat([dms[:, :, i] for i in 1:size(dms, 3)]...))
     stepsVec = getStepsVector(tables.A, siteBeads);
@@ -290,6 +309,9 @@ function plotMutSensVsDist!(ax, dms::Array{T,3}, siteBeads::Vector, tables::Tabl
     return nothing
 end
 
+"""
+Same as `plotMutSensVsDist!`, on a new figure. Returns the figure.
+"""
 function plotMutSensVsDist(dms::Array{T,3}, siteBeads::Vector, tables::Tables; color="k") where T <: Number
     fig, ax = subplots(figsize=(4,4))
     plotMutSensVsDist!(ax, dms, siteBeads, tables; color)
