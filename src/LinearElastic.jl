@@ -14,8 +14,8 @@ import LinearAlgebra: pinv
 include("types.jl")
 include("buildnetwork.jl")
 include("physics.jl")
-include("evolve.jl")
 include("fitness.jl")
+include("evolve.jl")
 include("mutate.jl")
 include("tools.jl")
 include("analysis.jl")
@@ -71,7 +71,11 @@ export
 
     # from fitness.jl
     computeFitness,
-    generalist,
+    Assay,
+    Binding,
+    DoubleBinding,
+    Allostery,
+    TargetBinding,
 
     # from mutate.jl
     mutateBead!,

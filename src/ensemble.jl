@@ -5,7 +5,7 @@ Evolve replicate MC trajectories.
 function evolveMCEnsemble(N_reps::Int,
                     ligands::Ligands,
                     tables::Tables,
-                    assay::String,
+                    assay::Assay,
                     N_iter::Int, # Number of iterations
                     ζ::Real,
                     β::Real)

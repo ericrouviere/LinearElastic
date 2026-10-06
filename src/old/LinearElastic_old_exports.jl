@@ -27,3 +27,6 @@
 # from tools.jl
 #    convertSettings2NetParams,
 #    convertSettings2EvoParams,
+
+# from fitness.jl (replaced by Assay types; generalist is now the internal doubleBinding)
+#    generalist,

@@ -2,25 +2,24 @@
 function evolveMC(net::Network,
                   ligands::Ligands,
                   tables::Tables,
-                  assay::String,
+                  assay::Assay,
                   N_iter::Int, # Number of iterations
                   ζ::Real,
                   β::Real;
-                  selParams::Tuple=(),
                   ϕ_terminate::Number=Inf, # terminate when ϕ>ϕ_terminate
                   Δt=0)
     # evolve network using monte carlo evolution.
     net = deepcopy(net)
     net_wt = deepcopy(net)
     updateNetParams!(net, tables) # make sure params are correct
-    ϕ = computeFitness(net, ligands, tables, assay, β; selParams)
+    ϕ = computeFitness(net, ligands, tables, assay, β)
     times, fitnesses, networks = Int[], Float64[], Network[]
     Δt == 0 && (Δt = N_iter+1) 
 
     for t in 1:N_iter
         networkCopy!(net_wt, net)
         mutateBead!(net, tables)
-        ϕ_mut = computeFitness(net, ligands, tables, assay, β; selParams)
+        ϕ_mut = computeFitness(net, ligands, tables, assay, β)
         # selection
         if rand() < exp(ζ*(ϕ_mut-ϕ))
             ϕ = ϕ_mut

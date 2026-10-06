@@ -166,10 +166,9 @@ function getSeqWithTargetBinding(ΔF_target::Vector,
                                  β::Number,
                                  similarityThresh::Number) # binding energy scale
 
-    assay = "TargetBinding"
+    assay = TargetBinding(ΔF_target...)
     N_iter = 5000
     ζ = 1e4
-    selParams=Tuple(ΔF_target)
     ϕ_terminate = -similarityThresh
     net_similar = buildRandNetwork(tables)
     times, fitnesses, networks = evolveMC(net_similar,
@@ -179,7 +178,6 @@ function getSeqWithTargetBinding(ΔF_target::Vector,
                                           N_iter,
                                           ζ,
                                           β;
-                                          selParams,
                                           Δt=0,
                                           ϕ_terminate);
     if fitnesses[end] < ϕ_terminate
