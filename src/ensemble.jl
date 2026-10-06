@@ -19,7 +19,6 @@ function evolveMCEns(N_reps::Int,
 end
 
 
-
 function evolvePopEns(seeds::Vector{UInt},
                       P::Integer,
                       ligands::Ligands,
@@ -101,37 +100,15 @@ end
 function computeStressEns(seqs::Vector{Vector{T}}, tables::Tables) where T <: Integer
     return map( x -> computeStress(x, tables), seqs)
 end
-# UNUSED: not called from exps/*/scripts or notebooks (commented out, not deleted)
-#function computeStressEns(seqs::Vector{Vector{Vector{T}}}, tables::Tables) where T <: Integer
-#    stress = zeros(length(seqs[1]), length(seqs))
-#    for j in axes(stress, 2), i in axes(stress, 1)
-#        stress[i,j] = computeStress(seqs[j][i], tables)
-#    end
-#    return stress
-#end
 
 function computeBindingStressEns(seqs::Vector{Vector{T}}, ligands::Ligands, tables::Tables) where T <: Integer
     return map( x -> computeBindingStress(x, ligands, tables), seqs)
 end
-# UNUSED: not called from exps/*/scripts or notebooks (commented out, not deleted)
-#function computeBindingStressEns(seqs::Vector{Vector{Vector{T}}}, ligands::Ligands, tables::Tables) where T <: Integer
-#    stress = zeros(length(seqs[1]), length(seqs))
-#    for j in axes(stress, 2), i in axes(stress, 1)
-#        stress[i,j] = computeBindingStress(seqs[j][i], ligands, tables)
-#    end
-#    return stress
-#end
 
 
 function computeMaxOverlapEns(seqs::Vector{Vector{T}}, ligands::Ligands, tables::Tables) where T <: Integer
     return map( x -> computeMaxOverlap(x, ligands, tables), seqs)
 end
-# UNUSED: not called from exps/*/scripts or notebooks (commented out, not deleted)
-#function computeMaxOverlapEns(seqs::Vector{Vector{Vector{T}}}, ligands::Ligands, tables::Tables) where T <: Integer
-#    newseqs = hcat(seqs...)
-#    return pmap( x -> computeMaxOverlap(vec(x), ligands, tables), newseqs)
-#end
-
 
 
 ##############################################################3
@@ -154,6 +131,5 @@ function convertPopArray2Populations(popArray::Array{Int8, 3})
     return [ Vector{Int}[ eachcol(popArray[:,:,i])... ]  for i in 1:size(popArray, 3) ]
     #return [eachcol( popArray[:,:,i])...]
 end
-
 
 

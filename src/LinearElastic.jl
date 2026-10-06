@@ -48,14 +48,11 @@ export
     logpdet,
     computeBondVector,
     computeBondElongationMode,
-    formatLigandParams,
-    computeBindingFreeEnergy,
     computePerturbedNetParams!,
     computePerturbedNetParams_old,
     pdetdiagm,
     computePerturbedGroundState,
     getNetParams,
-    # getNetParams_old, # keep for unit tests # UNUSED
     updateNetParams!,
     pinv,
     computeBindingRandSeqs,
@@ -66,7 +63,6 @@ export
     # from evolve.jl
     evolveMC,
     evolvePop!,
-    # evolvePop, # UNUSED
     evolvePop_seqsOnly,
     updateAllFitnesses!,
     fits2weights,
@@ -83,8 +79,6 @@ export
 
     # from tools.jl
     networkCopy!,
-    convertSettings2NetParams,
-    convertSettings2EvoParams,
 
     # from analysis.jl
     computeBindingDMS,
@@ -93,8 +87,6 @@ export
     getStepsVector,
     getStepsMat,
     getSiteBeads,
-    # scanAllostericSurface, # UNUSED
-    # computeAllostery, # UNUSED
     getSeqWithTargetBinding,
     compareSeqWithSameBinding,
     computeStress,
@@ -105,14 +97,11 @@ export
 
     # from plotfuncs.jl
     plotNetwork!,
-    # plotNetwork, # UNUSED
     plotDisplacement!,
     plotBondStiffness!,
     plotNetworkColoredBonds!,
     plotDensityBindingSpaceScatter,
-    # plotBindingEvoTraces, # UNUSED
     plotEvoPathBindingSpace,
-    # plotGeneralistSpecialistEvoTraces, # UNUSED
     makePopulationFrame,
     makePopulationDynamicsMovieFrames,
     plotDMS,
