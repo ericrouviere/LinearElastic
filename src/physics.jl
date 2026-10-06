@@ -192,7 +192,7 @@ function updateNetParams!(net::Network, tables::Tables)
     # compute the values of the network parameters and update the struct
     G, lpdH, h, c = getNetParams(net.seq, tables)
     net.G .= G
-    lpdH = lpdH
+    net.lpdH = lpdH
     net.h .= h
     net.c = c
     return nothing
