@@ -74,7 +74,7 @@ julia --project=. test/test_evolve.jl    # assays, fitness map, seeded/parallel 
 | Type | Role |
 |------|------|
 | `Tables` | Fixed for an experiment: bead positions `R = [x1,y1,x2,y2,...]`, adjacency `A`, stiffness table `K`, mismatch table `D`, contact table `E` (unused) |
-| `Network` | One evolving sequence and its cached energy parameters `G = pinv(H)`, `lpdH = log pdet(H)`, `h`, `c`. The `δ*` fields are scratch buffers |
+| `Network` | One evolving sequence and its cached energy parameters (of `U = ½ r'Hr − h'r + c`) `G = pinv(H)`, `lpdH = log pdet(H)`, `h`, `c`. The `δ*` fields are scratch buffers |
 | `Perturbation` | `bonds`, `Δk`, `Δd`: changes in stiffness and rest-length mismatch of a set of bonds. Used for ligands and mutations |
 | `Ligands` | `list::Vector{Perturbation}`; `list[1]` is the solvent, `list[2]`, `list[3]` the two environments |
 | `EvoParams` | Evolutionary parameters: `P` (population), `N` (generations), `μ` (per-site mutation rate), `τ` (env timescale), `α` (selection strength). Built from settings with `convertEvoParams(S)` |
@@ -87,7 +87,7 @@ julia --project=. test/test_evolve.jl    # assays, fitness map, seeded/parallel 
   (`N_sdims=2` is asserted in places).
 - Each bead has a type in `1:N_types`, and a sequence is a `Vector{Int}` of types. The bond between beads i and j has
   stiffness `K[seq[i],seq[j]]` (log-uniform in `[k_min,k_max]`) and mismatch `D[seq[i],seq[j]]` (Gaussian, sd `mismatchVar`).
-- Energy: `U(r) = ½ r'Hr + h'r + c` with `H = T'ΓT`, `h = T'ΓM·1`, `c = ½·1'ΓM²1`. Here `T` is the beads-to-bonds matrix
+- Energy: `U(r) = ½ r'Hr − h'r + c` (the sum over bonds of `½ k (e − d)²`, `e` the bond elongation) with `H = T'ΓT`, `h = T'ΓM·1`, `c = ½·1'ΓM²1`. Here `T` is the beads-to-bonds matrix
   (`makeBeads2BondsMatrix`), `Γ = diag(k)` and `M = diag(d)`. The free energy is the ground-state energy (`-½h'Gh + c`)
   plus the fluctuation term from `log pdet(H)` (3 zero modes in 2D). Unlike SpinModel, `β` is a real parameter here:
   it weighs the fluctuation term against the ground-state energy.
