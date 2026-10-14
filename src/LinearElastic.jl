@@ -78,8 +78,7 @@ export
 
     # from fitness.jl
     computeFitness,
-    foldedFraction,
-    logFoldedFraction,
+    isFolded,
     Assay,
     Binding,
     Binding1,

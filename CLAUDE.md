@@ -82,7 +82,7 @@ julia --project=. test/test_evolve.jl    # assays, fitness map, seeded/parallel 
 | `Network` | One evolving sequence and its cached energy parameters (of `U = ½ r'Hr − h'r + c`) `G = pinv(H)`, `lpdH = log pdet(H)`, `h`, `c`. The `δ*` fields are scratch buffers |
 | `Perturbation` | `bonds`, `Δk`, `Δd`: changes in stiffness and rest-length mismatch of a set of bonds. Used for ligands and mutations |
 | `Ligands` | `list::Vector{Perturbation}`; `list[1]` is the solvent, `list[2]`, `list[3]` the two environments |
-| `EvoParams` | Evolutionary parameters: `P` (population), `N` (generations), `μ` (per-site mutation rate), `τ` (env timescale), `α` (selection strength). Built from settings with `convertEvoParams(S)` |
+| `EvoParams` | Evolutionary parameters: `P` (population), `N` (generations), `μ` (per-site mutation rate), `τ` (env timescale), `α` (selection strength), `F_unfolded` (stability threshold, `Inf` if omitted: `EvoParams(P, N, μ, τ, α)`). Built from settings with `convertEvoParams(S)` |
 | `Assay` | Selective pressure, passed as a value: `Binding()`, `DoubleBinding()`, `Allostery()`, `TargetBinding(ΔF1_target, ΔF2_target)` |
 
 ## Architecture
@@ -115,16 +115,16 @@ dispatches on the type; add a pressure with a new struct plus one `computeFitnes
 `Binding` needs 2 ligand states, `Binding1`/`Binding2` (binding of ligand 1 or 2), `DoubleBinding` (the generalist score
 `min(-ΔF1, -ΔF2)`) and `TargetBinding` need 3, `Allostery` needs 4.
 
-**Folding.** `foldedFraction(F, F_unfolded, β) = 1/(1 + exp(β(F − F_unfolded)))`, with `F = F(s, λ0)` the solvent-state free
-energy and `F_unfolded` the unfolded-state free energy, a physical parameter passed as the keyword `F_unfolded` to every
-population-evolution function (default `Inf`: never unfolds, identical to no unfolding). Selection weights are
-`p_fold · exp(α f)` (`fits2weights(f, α, logFoldedFraction)`). `F_unfolded` must be chosen relative to the free energies the
+**Folding.** A hard stability threshold: `isFolded(F, F_unfolded) = F <= F_unfolded`, with `F = F(s, λ0)` the solvent-state
+free energy and `F_unfolded` the threshold, the field `evo.F_unfolded` of `EvoParams`
+(default `Inf`: never unfolds, bit-identical to no threshold). Selection weights are `exp(α f)` for folded individuals and
+exactly 0 for unfolded ones (`fits2weights(f, α, folded)`); it throws if the whole population is unfolded. `F_unfolded` must be chosen relative to the free energies the
 code computes (e.g. a quantile of random sequences' `F(s, λ0)`); the code's constant counts all 2N coordinates in
 `n log(2π/β)` (methods Eq. 4 uses 2N − 3), a sequence-independent shift of −(3/2β) log(2π/β).
 
 ### Evolution (`src/evolve.jl`)
 - `evolveMC(net, ligands, tables, assay, N_iter, ζ, β; Δt, ϕ_terminate)`: single-trajectory Metropolis walk under an `Assay`.
-- `evolvePop!(nets, ligands, tables, β, evo; k_init, sampleLastHalf, N_seqs2Keep, F_unfolded)`: population of `evo.P`
+- `evolvePop!(nets, ligands, tables, β, evo; k_init, sampleLastHalf, N_seqs2Keep)`: population of `evo.P`
   networks under fluctuating selection; the environment switches between ligand 1 and 2 (`Binding1`, `Binding2`) every
   `τ` generations. Returns `(fitBucket, netBucket, F0Bucket)`: fitness `P × 2 × N`, `N_seqs2Keep` networks sampled from
   the last half of the run (aligned to the env cycle), and the solvent-state free energy `P × N`.
@@ -140,11 +140,11 @@ code computes (e.g. a quantile of random sequences' `F(s, λ0)`); the code's con
 
 ### Ensemble (`src/ensemble.jl`)
 Naming convention: append `Ensemble` to the single-run function name (`evolvePopEnsemble`, `computeBindingDMSEnsemble`).
-- `evolvePopEnsemble(ligands, tables, β, evo, seeds; k_init_vec, N_seqs2Keep, F_unfolded, pool)` evolves one replicate per seed over
+- `evolvePopEnsemble(ligands, tables, β, evo, seeds; k_init_vec, N_seqs2Keep, pool)` evolves one replicate per seed over
   a Distributed worker pool. Each replicate seeds its worker's RNG, so results do not depend on scheduling. `k_init_vec`
   defaults to a random initial environment per replicate. Output is `Vector{Vector{Vector{Int}}}` (rep → seq → beads);
   `convertPopulations2PopArray` turns it into an `Int8` array `(N_beads, N_seqs2Keep, N_reps)` for saving.
-- `evolvePopStaticEnsemble(ligands, tables, β, evo, assay, seeds; N_seqs2Keep, F_unfolded, pool)`: static counterpart.
+- `evolvePopStaticEnsemble(ligands, tables, β, evo, assay, seeds; N_seqs2Keep, pool)`: static counterpart.
 - `computeBindingDMSEnsemble(populations, ligands, tables, β; pool)` runs one flat `pmap` over all sequences (batched,
   since a scan takes ~10 ms) and returns `DMS[type, bead, lig, seq, rep]` and `ΔF[lig, seq, rep]`.
 - All `pmap`s go through `withPool(f, pool)`: with `pool = nothing` (default) it uses a temporary `CachingPool(workers())`

@@ -55,14 +55,15 @@ function evolveMC(net::Network,
 end
 
 """
-    evolvePop!(nets, ligands, tables, β, evo; k_init=1, sampleLastHalf=true, N_seqs2Keep=length(nets), F_unfolded=Inf)
+    evolvePop!(nets, ligands, tables, β, evo; k_init=1, sampleLastHalf=true, N_seqs2Keep=length(nets))
 
 Evolve the population `nets` in place for `evo.N` generations under fluctuating
 selection. `ligands` holds the solvent and the two ligand states, one per environment.
 Each generation:
 1. scores every network in both environments, `f_k = F_solvent - F_k` (`Binding1`, `Binding2`),
-2. resamples the population with weights `p_fold exp(α f_k)` in the current environment `k`,
-   where `p_fold = foldedFraction(F_solvent, F_unfolded, β)` (1 for `F_unfolded = Inf`),
+2. resamples the population with weights `exp(α f_k)` in the current environment `k`,
+   and weight 0 for unfolded networks, those with `F_solvent > evo.F_unfolded`
+   (`isFolded`; none for `F_unfolded = Inf`); throws an error if every network is unfolded,
 3. mutates every bead of every network with probability `evo.μ`,
 4. switches environment every `evo.τ` generations, starting in `k_init`.
 
@@ -79,15 +80,14 @@ function evolvePop!(nets::Vector{Network},
                     evo::EvoParams;
                     k_init::Int=1, # Initial enviroment
                     sampleLastHalf::Bool=true, # if true sample last half, if false return final
-                    N_seqs2Keep::Int=length(nets),
-                    F_unfolded::Real=Inf) # free energy of the unfolded state
+                    N_seqs2Keep::Int=length(nets))
     @assert length(ligands.list) == 3 "fluctuating selection needs the solvent and two ligand states"
     return _evolvePopulation!(nets, ligands, tables, β, evo, (Binding1(), Binding2()), evo.τ;
-                              k_init, sampleLastHalf, N_seqs2Keep, F_unfolded)
+                              k_init, sampleLastHalf, N_seqs2Keep)
 end
 
 """
-    evolvePopStatic!(nets, ligands, tables, β, evo, assay; sampleLastHalf=true, N_seqs2Keep=length(nets), F_unfolded=Inf)
+    evolvePopStatic!(nets, ligands, tables, β, evo, assay; sampleLastHalf=true, N_seqs2Keep=length(nets))
 
 Evolve the population `nets` in place for `evo.N` generations under static selection:
 every generation is scored by `computeFitness` with the same `assay` (e.g. `Binding1()`
@@ -102,10 +102,9 @@ function evolvePopStatic!(nets::Vector{Network},
                           evo::EvoParams,
                           assay::Assay;
                           sampleLastHalf::Bool=true,
-                          N_seqs2Keep::Int=length(nets),
-                          F_unfolded::Real=Inf)
+                          N_seqs2Keep::Int=length(nets))
     return _evolvePopulation!(nets, ligands, tables, β, evo, (assay,), 1;
-                              k_init=1, sampleLastHalf, N_seqs2Keep, F_unfolded)
+                              k_init=1, sampleLastHalf, N_seqs2Keep)
 end
 
 """
@@ -119,8 +118,8 @@ individual that was not drawn) only when it mutates.
 """
 function _evolvePopulation!(nets::Vector{Network}, ligands::Ligands, tables::Tables,
                             β::Number, evo::EvoParams, assays::Tuple, τ::Integer;
-                            k_init::Int, sampleLastHalf::Bool, N_seqs2Keep::Int, F_unfolded::Real)
-    N_gen, μ, α = evo.N, evo.μ, evo.α
+                            k_init::Int, sampleLastHalf::Bool, N_seqs2Keep::Int)
+    N_gen, μ, α, F_unfolded = evo.N, evo.μ, evo.α, evo.F_unfolded
     N_assays = length(assays)
     @assert iseven(N_gen)
     @assert 0 <= μ <= 1 # constrain mutation rate to be a probability
@@ -136,7 +135,7 @@ function _evolvePopulation!(nets::Vector{Network}, ligands::Ligands, tables::Tab
     k = k_init # environment index
     fits = zeros(P, N_assays)
     F0 = zeros(P) # solvent-state free energy
-    lnFolded = zeros(P) # log of the folded fraction
+    folded = trues(P) # F0 <= F_unfolded
     mutated = trues(P) # whose fitness must be recomputed
     spare = Network[] # networks of individuals that were not drawn, reused for copies
     netBucket = Network[] # list to save networks
@@ -144,11 +143,11 @@ function _evolvePopulation!(nets::Vector{Network}, ligands::Ligands, tables::Tab
     F0Bucket = zeros(P, N_gen)
 
     for t in 1:N_gen # generations
-        updateAllFitnesses!(fits, F0, lnFolded, nets, ligands, tables, assays, mutated, β, F_unfolded)
+        updateAllFitnesses!(fits, F0, folded, nets, ligands, tables, assays, mutated, β, F_unfolded)
         fitBucket[:, :, t] .= fits
         F0Bucket[:, t] .= F0
 
-        applySelection!(nets, spare, fits, F0, lnFolded, α, k)
+        applySelection!(nets, spare, fits, F0, folded, α, k)
         mutateCopyOnWrite!(nets, spare, mutated, μ, tables)
 
         # switch environments
@@ -168,7 +167,7 @@ end
 
 
 """
-    evolvePop(ligands, tables, β, evo, seed; k_init, sampleLastHalf, N_seqs2Keep, F_unfolded)
+    evolvePop(ligands, tables, β, evo, seed; k_init, sampleLastHalf, N_seqs2Keep)
 
 Seeded variant of `evolvePop!`: build a random population of `evo.P` networks
 and evolve it, returning only the sampled sequences. Seeds the global RNG with
@@ -182,16 +181,15 @@ function evolvePop(ligands::Ligands,
                    seed::Integer;
                    k_init::Int=1, # Initial enviroment
                    sampleLastHalf::Bool=true, # if true sample last half, if false return final
-                   N_seqs2Keep::Int=evo.P,
-                   F_unfolded::Real=Inf)
+                   N_seqs2Keep::Int=evo.P)
     Random.seed!(seed)
     nets = [buildRandNetwork(tables) for i in 1:evo.P]
-    _, netBucket, _ = evolvePop!(nets, ligands, tables, β, evo; k_init, sampleLastHalf, N_seqs2Keep, F_unfolded)
+    _, netBucket, _ = evolvePop!(nets, ligands, tables, β, evo; k_init, sampleLastHalf, N_seqs2Keep)
     return map(x -> x.seq, netBucket) # return only the sequences.
 end
 
 """
-    evolvePopStatic(ligands, tables, β, evo, assay, seed; sampleLastHalf, N_seqs2Keep, F_unfolded)
+    evolvePopStatic(ligands, tables, β, evo, assay, seed; sampleLastHalf, N_seqs2Keep)
 
 Seeded variant of `evolvePopStatic!`: build a random population of `evo.P` networks,
 evolve it under static selection on `assay`, and return only the sampled sequences.
@@ -203,21 +201,21 @@ function evolvePopStatic(ligands::Ligands,
                          assay::Assay,
                          seed::Integer;
                          sampleLastHalf::Bool=true,
-                         N_seqs2Keep::Int=evo.P,
-                         F_unfolded::Real=Inf)
+                         N_seqs2Keep::Int=evo.P)
     Random.seed!(seed)
     nets = [buildRandNetwork(tables) for i in 1:evo.P]
-    _, netBucket, _ = evolvePopStatic!(nets, ligands, tables, β, evo, assay; sampleLastHalf, N_seqs2Keep, F_unfolded)
+    _, netBucket, _ = evolvePopStatic!(nets, ligands, tables, β, evo, assay; sampleLastHalf, N_seqs2Keep)
     return map(x -> x.seq, netBucket)
 end
 
 
 """
 Recompute, for every network `i` with `mutated[i]`, its fitness under each assay
-(`fits[i, a]`), its solvent-state free energy `F0[i]` and the log of its folded
-fraction `lnFolded[i]`. The other networks have not changed since they were scored.
+(`fits[i, a]`), its solvent-state free energy `F0[i]` and whether it is folded,
+`folded[i] = isFolded(F0[i], F_unfolded)`. The other networks have not changed since
+they were scored.
 """
-function updateAllFitnesses!(fits::Matrix, F0::Vector, lnFolded::Vector,
+function updateAllFitnesses!(fits::Matrix, F0::Vector, folded::AbstractVector{Bool},
                              nets::Vector{Network}, ligands::Ligands, tables::Tables,
                              assays::Tuple, mutated::BitVector, β::Number, F_unfolded::Real)
     for i in eachindex(nets)
@@ -227,7 +225,7 @@ function updateAllFitnesses!(fits::Matrix, F0::Vector, lnFolded::Vector,
             fits[i, a] = computeFitness(assay, F)
         end
         F0[i] = F[1]
-        lnFolded[i] = logFoldedFraction(F[1], F_unfolded, β)
+        folded[i] = isFolded(F[1], F_unfolded)
     end
     return nothing
 end
@@ -245,30 +243,33 @@ function fits2weights(fits::AbstractVector, α::Number)
 end
 
 """
-    fits2weights(fits, α, lnFolded)
+    fits2weights(fits, α, folded)
 
-Selection weights `w ∝ p_fold exp(α f)`, with `lnFolded = log p_fold` for each
-individual, normalized so that the largest weight is 1.
+Selection weights `w ∝ exp(α f)` for folded individuals (`folded[i]`) and `w = 0` for
+unfolded ones, normalized so that the largest weight is 1. Throws an error if no
+individual is folded, since then no one can reproduce.
 """
-function fits2weights(fits::AbstractVector, α::Number, lnFolded::AbstractVector)
-    z = α .* fits .+ lnFolded
-    return exp.(z .- maximum(z))
+function fits2weights(fits::AbstractVector, α::Number, folded::AbstractVector{Bool})
+    any(folded) || error("every individual is unfolded (F_solvent > F_unfolded): no one can reproduce")
+    z = α .* fits
+    zmax = maximum(z[i] for i in eachindex(z) if folded[i])
+    return ifelse.(folded, exp.(z .- zmax), zero(eltype(z)))
 end
 
 """
 Resample the population in place: draw `P` survivors with replacement, with weights
-`fits2weights(fits[:, k], α, lnFolded)` from the fitnesses in environment `k`. A
+`fits2weights(fits[:, k], α, folded)` from the fitnesses in environment `k`. A
 survivor drawn for the first time stays in its slot; each extra draw fills the slot of
 an individual that was not drawn (in increasing slot order) and refers to the same
 `Network` as its parent, so several slots may share one. Networks that are no longer
 referenced are added to `spare` for reuse.
 """
 function applySelection!(nets::Vector{Network}, spare::Vector{Network},
-                         fits::Matrix, F0::Vector, lnFolded::Vector,
+                         fits::Matrix, F0::Vector, folded::AbstractVector{Bool},
                          α::Number, # selection strength
                          k::Int) # the environment index
     P = length(nets)
-    w = fits2weights(view(fits, :, k), α, lnFolded)
+    w = fits2weights(view(fits, :, k), α, folded)
     winners = wsample(1:P, w, P)
     drawn = falses(P)
     repeats = Int[] # extra draws of a survivor, in the order drawn
@@ -281,7 +282,7 @@ function applySelection!(nets::Vector{Network}, spare::Vector{Network},
         nets[hole] = parents[parent]
         fits[hole, :] .= view(fits, parent, :)
         F0[hole] = F0[parent]
-        lnFolded[hole] = lnFolded[parent]
+        folded[hole] = folded[parent]
     end
     survivors = IdDict{Network, Nothing}(n => nothing for n in nets)
     released = IdDict{Network, Nothing}()

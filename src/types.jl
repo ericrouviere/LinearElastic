@@ -56,7 +56,10 @@ end
 """
 Parameters of the evolutionary process: population size `P`, number of generations
 `N`, mutation rate per site per generation `μ`, environmental timescale `τ`
-(generations between environment switches) and selection strength `α`.
+(generations between environment switches), selection strength `α` and stability
+threshold `F_unfolded`: an individual whose solvent-state free energy is above it is
+unfolded and cannot reproduce (`isFolded`). `EvoParams(P, N, μ, τ, α)` sets
+`F_unfolded = Inf` (no stability selection).
 """
 mutable struct EvoParams
     P::Int # population size
@@ -64,4 +67,7 @@ mutable struct EvoParams
     μ::Float64 # mutation rate per site per generation
     τ::Int # environmental timescale
     α::Float64 # selection strength
+    F_unfolded::Float64 # stability threshold on the solvent-state free energy
 end
+
+EvoParams(P, N, μ, τ, α) = EvoParams(P, N, μ, τ, α, Inf)

@@ -115,25 +115,15 @@ function computeFitness(net::Network, ligands::Ligands, tables::Tables,
 end
 
 
-# Folding. A sequence folds into the network with free energy F (the solvent state,
-# λ0) or unfolds with free energy F_unfolded; in equilibrium between the two states
-# the folded fraction is a Fermi function of their difference.
+# Folding. A sequence folds if the free energy F of its network in the solvent state
+# (λ0) is at most the threshold F_unfolded, and is unfolded otherwise.
 
 """
-    foldedFraction(F, F_unfolded, β)
+    isFolded(F, F_unfolded)
 
-Fraction of time a protein with folded free energy `F` is folded, in equilibrium with
-an unfolded state of free energy `F_unfolded`: `1 / (1 + exp(β (F - F_unfolded)))`.
-Close to 1 when `F` is well below `F_unfolded` and close to 0 when it is well above;
-exactly 1 for `F_unfolded = Inf`. Population evolution multiplies selection weights
-by it, so sequences that do not fold are strongly selected against.
+Whether a protein whose network has free energy `F` in the solvent state is folded:
+`F <= F_unfolded`, a hard stability threshold. Always true for `F_unfolded = Inf`.
+In population evolution an unfolded individual has selection weight 0: it cannot
+reproduce, whatever its binding energy.
 """
-foldedFraction(F::Real, F_unfolded::Real, β::Real) = exp(logFoldedFraction(F, F_unfolded, β))
-
-"""
-Logarithm of `foldedFraction(F, F_unfolded, β)`, computed without overflow.
-"""
-function logFoldedFraction(F::Real, F_unfolded::Real, β::Real)
-    x = β * (F - F_unfolded)
-    return x > 0 ? -(x + log1p(exp(-x))) : -log1p(exp(x))
-end
+isFolded(F::Real, F_unfolded::Real) = F <= F_unfolded

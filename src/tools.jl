@@ -1,10 +1,12 @@
 """
     convertEvoParams(S::Dict)
 
-Build an `EvoParams` from a settings dict with keys "P", "N", "μ", "τ" and "α".
+Build an `EvoParams` from a settings dict with keys "P", "N", "μ", "τ", "α" and,
+optionally, "F_unfolded" (default `Inf`, as in settings written before it existed).
 """
 function convertEvoParams(S::Dict)
-    return EvoParams(S["P"], S["N"], Float64(S["μ"]), S["τ"], Float64(S["α"]))
+    return EvoParams(S["P"], S["N"], Float64(S["μ"]), S["τ"], Float64(S["α"]),
+                     Float64(get(S, "F_unfolded", Inf)))
 end
 
 # convert between postions as a vector r = [x1,y1,x2,y2,...]

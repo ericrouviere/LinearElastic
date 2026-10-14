@@ -40,7 +40,7 @@ end
 
 
 """
-    evolvePopEnsemble(ligands, tables, β, evo, seeds; k_init_vec, N_seqs2Keep, F_unfolded=Inf, pool=nothing)
+    evolvePopEnsemble(ligands, tables, β, evo, seeds; k_init_vec, N_seqs2Keep, pool=nothing)
 
 Evolve one replicate population per entry of `seeds` under fluctuating selection
 (`evolvePop`), in parallel over the worker pool (serially when no workers have been
@@ -58,17 +58,16 @@ function evolvePopEnsemble(ligands::Ligands,
                            seeds::AbstractVector{<:Integer};
                            k_init_vec=rand(1:(length(ligands.list)-1), length(seeds)),
                            N_seqs2Keep::Int=evo.P,
-                           F_unfolded::Real=Inf,
                            pool=nothing)
     @assert length(seeds) == length(k_init_vec)
     return withPool(pool) do p
-        pmap((s, k) -> evolvePop(ligands, tables, β, evo, s; k_init=k, N_seqs2Keep, F_unfolded),
+        pmap((s, k) -> evolvePop(ligands, tables, β, evo, s; k_init=k, N_seqs2Keep),
              p, seeds, k_init_vec)
     end
 end
 
 """
-    evolvePopStaticEnsemble(ligands, tables, β, evo, assay, seeds; N_seqs2Keep, F_unfolded=Inf, pool=nothing)
+    evolvePopStaticEnsemble(ligands, tables, β, evo, assay, seeds; N_seqs2Keep, pool=nothing)
 
 Static-selection counterpart of `evolvePopEnsemble`: one seeded replicate per entry of
 `seeds`, each evolved by `evolvePopStatic` on `assay`, in parallel over the worker pool.
@@ -81,10 +80,9 @@ function evolvePopStaticEnsemble(ligands::Ligands,
                                  assay::Assay,
                                  seeds::AbstractVector{<:Integer};
                                  N_seqs2Keep::Int=evo.P,
-                                 F_unfolded::Real=Inf,
                                  pool=nothing)
     return withPool(pool) do p
-        pmap(s -> evolvePopStatic(ligands, tables, β, evo, assay, s; N_seqs2Keep, F_unfolded), p, seeds)
+        pmap(s -> evolvePopStatic(ligands, tables, β, evo, assay, s; N_seqs2Keep), p, seeds)
     end
 end
 

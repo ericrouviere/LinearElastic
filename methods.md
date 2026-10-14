@@ -32,11 +32,11 @@ $$F(\mathbf{s}, \lambda) = -\frac{1}{\beta} \ln \int d\mathbf{u}\, e^{-\beta U(\
 
 The first two terms are the energy of the ground state $\mathbf{u}^* = C \mathbf{h}$, and the last term is the free energy of thermal fluctuations about it. We use $\beta = 1$.
 
-The network can also unfold. We treat folding as an equilibrium between two states: the folded network in solvent, with free energy $F(\mathbf{s}, \lambda_0)$, and an unfolded state whose free energy $F_{\mathrm{u}}$ is the same for every sequence. The fraction of time a sequence spends folded is then
+The network can also unfold. Folding is a hard stability threshold $F_{\mathrm{u}}$ on the free energy of the network in solvent: a sequence folds if $F(\mathbf{s}, \lambda_0) \le F_{\mathrm{u}}$ and is unfolded otherwise,
 
-$$p_{\mathrm{fold}}(\mathbf{s}) = \frac{1}{1 + e^{\beta \left(F(\mathbf{s}, \lambda_0) - F_{\mathrm{u}}\right)}}, \tag{5}$$
+$$\phi(\mathbf{s}) = \begin{cases} 1 & \text{if } F(\mathbf{s}, \lambda_0) \le F_{\mathrm{u}}, \\ 0 & \text{otherwise}. \end{cases} \tag{5}$$
 
-close to 1 for sequences whose free energy is well below $F_{\mathrm{u}}$ and close to 0 for those well above it. $F_{\mathrm{u}}$ is a physical parameter of the model; $F_{\mathrm{u}} = \infty$ means that no sequence unfolds.
+$F_{\mathrm{u}}$ is a parameter of the model; $F_{\mathrm{u}} = \infty$ means that no sequence unfolds.
 
 ## Binding free energies
 
@@ -52,11 +52,11 @@ The binding energies $\Delta F_1$ and $\Delta F_2$ depend only on the sequence, 
 
 ## Selection
 
-Selection rewards tighter binding, and folding, with increased probability of reproduction. With $\Delta F^n_k$ denoting the binding energy to ligand $k \in \{1, 2\}$ of the $n$th individual and $p^n_{\mathrm{fold}}$ its folded fraction, Eq. (5), the population at generation $t + 1$ is obtained by sampling $P$ individuals at generation $t$ according to a multinomial distribution with probabilities
+Selection rewards tighter binding, and folding, with increased probability of reproduction. With $\Delta F^n_k$ denoting the binding energy to ligand $k \in \{1, 2\}$ of the $n$th individual. To implement a selection for stability, a non functional unfolded state is defined to have a free energy $F_{\mathrm{unfolded}}$ . If the free energy in the unbound state, $F(\mathbf{s}, \lambda_0)$ is greater than $F_{\mathrm{unfolded}}$ then the system is taken to be unfolded and is does not reproduce. This is captured by variable  $\phi^n =  \Theta(F_{\mathrm{unfolded}} -  F(\mathbf{s}, \lambda_0)$), where $\Theta$ is the Heaviside function. The population at generation $t + 1$ is obtained by sampling $P$ individuals at generation $t$ according to a multinomial distribution with probabilities
 
-$$p^n_t = \frac{p^n_{\mathrm{fold}}\, e^{-a \Delta F^n_{k(t)} / \Delta F_0}}{\sum_{n'=1}^{P} p^{n'}_{\mathrm{fold}}\, e^{-a \Delta F^{n'}_{k(t)} / \Delta F_0}}, \qquad k(t) = 1 + \left[\left(\left\lfloor \frac{t - 1}{\tau} \right\rfloor + k_0 - 1\right) \bmod 2\right]. \tag{8}$$
+$$p^n_t = \frac{\phi^n\, e^{-a \Delta F^n_{k(t)} / \Delta F_0}}{\sum_{n'=1}^{P} \phi^{n'}\, e^{-a \Delta F^{n'}_{k(t)} / \Delta F_0}}, \qquad k(t) = 1 + \left[\left(\left\lfloor \frac{t - 1}{\tau} \right\rfloor + k_0 - 1\right) \bmod 2\right]. \tag{8}$$
 
-A sequence that does not fold is therefore strongly selected against, whatever its binding energy. The switching selective pressure is implemented by $k(t)$, which alternates between $k = 1$ and $k = 2$ every $\tau$ generations, starting from an environment $k_0$ drawn uniformly for each replicate. Under static selection, $k(t) = k$ is held fixed. $\Delta F_0$ is the scale of the binding energies. Unlike in a model with bounded energies, it has no simple closed form here, so we take it as the spread of the binding energies of $10^3$ uniformly random sequences: the standard deviation of the distance of the points $(\Delta F_1, \Delta F_2)$ from their centroid. The parameter $a > 0$ defines the selective pressure, and we use $a = 1$.
+A sequence that does not fold therefore has zero probability of reproduction, whatever its binding energy. The switching selective pressure is implemented by $k(t)$, which alternates between $k = 1$ and $k = 2$ every $\tau$ generations, starting from an environment $k_0$ drawn uniformly for each replicate. Under static selection, $k(t) = k$ is held fixed. $\Delta F_0$ is the scale of the binding energies. Unlike in a model with bounded energies, it has no simple closed form here, so we take it as the spread of the binding energies of $10^3$ uniformly random sequences: the standard deviation of the distance of the points $(\Delta F_1, \Delta F_2)$ from their centroid. The parameter $a > 0$ defines the selective pressure, and we use $a = 1$.
 
 ## Evolutionary dynamics
 
@@ -74,7 +74,7 @@ We simulated the evolution of a population of fixed size $P = 100$ using Wrightâ
 | $\kappa$ | ligand spring stiffness | 1 |
 | $\lambda_0, \lambda_1, \lambda_2$ | solvent and ligand rest-length offsets | $0, 0.2, -0.2$ |
 | $\beta$ | inverse temperature | 1 |
-| $F_{\mathrm{u}}$ | free energy of the unfolded state | $\infty$ (no unfolding) |
+| $F_{\mathrm{u}}$ | stability threshold on $F(\mathbf{s}, \lambda_0)$ | $\infty$ (no unfolding) |
 | $P$ | population size | 100 |
 | $\mu$ | mutation rate per site per generation | $3 \times 10^{-3}$ |
 | $a$ | selective pressure | 1 |

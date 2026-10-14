@@ -32,17 +32,19 @@ end
         @test computeFitness(Binding2(), [1.0, 0.25, 0.5]) == 0.5
     end
 
-    @testset "folded fraction" begin
-        @test foldedFraction(-10.0, 0.0, 1.0) ≈ 1 / (1 + exp(-10))
-        @test foldedFraction(0.0, 0.0, 1.0) == 0.5
-        @test foldedFraction(10.0, 0.0, 2.0) ≈ 1 / (1 + exp(20))
-        @test foldedFraction(-120.0, Inf, 1.0) == 1 # no unfolding by default
-        @test logFoldedFraction(1e4, 0.0, 1.0) ≈ -1e4 # no overflow far above the threshold
-        @test logFoldedFraction(-1e4, 0.0, 1.0) == 0
-        f, lnp = [0.1, -0.3, 0.05], [0.0, -2.0, -50.0]
-        w = fits2weights(f, 4.0, lnp)
+    @testset "folding threshold" begin
+        @test isFolded(-10.0, 0.0)
+        @test isFolded(0.0, 0.0)
+        @test !isFolded(1e-12, 0.0) # the threshold is sharp
+        @test isFolded(-120.0, Inf) # no unfolding by default
+        f = [0.1, -0.3, 0.05, 0.9]
+        folded = [true, true, true, false] # the fittest individual is unfolded
+        w = fits2weights(f, 4.0, folded)
+        @test w[4] == 0
         @test maximum(w) == 1
-        @test w[3] / w[1] ≈ exp(4.0 * (f[3] - f[1]) + lnp[3] - lnp[1])
+        @test w[3] / w[1] ≈ exp(4.0 * (f[3] - f[1]))
+        @test fits2weights(f, 4.0, trues(4)) == fits2weights(f, 4.0) # all folded: as without the threshold
+        @test_throws ErrorException fits2weights(f, 4.0, falses(4))
     end
 
     @testset "computeFitness on a network matches its free energies" begin
@@ -62,7 +64,9 @@ end
 
     @testset "EvoParams from a settings dict" begin
         evo = convertEvoParams(Dict("P" => 10, "N" => 64, "μ" => 1e-2, "τ" => 4, "α" => 50))
-        @test (evo.P, evo.N, evo.μ, evo.τ, evo.α) == (10, 64, 0.01, 4, 50.0)
+        @test (evo.P, evo.N, evo.μ, evo.τ, evo.α, evo.F_unfolded) == (10, 64, 0.01, 4, 50.0, Inf)
+        evo = convertEvoParams(Dict("P" => 10, "N" => 64, "μ" => 1e-2, "τ" => 4, "α" => 50, "F_unfolded" => -150))
+        @test evo.F_unfolded == -150.0
     end
 
     @testset "seeded ensembles are reproducible" begin
@@ -130,19 +134,19 @@ end
         Random.seed!(7)
         F0_rand = [computeFreeEnergies(buildRandNetwork(tables), ligands, tables, β)[1] for _ in 1:200]
         F_unfolded = sort(F0_rand)[20] # only about 10% of random sequences fold
-        evo = EvoParams(40, 100, 1e-2, 1, 1.0) # weak selection on binding
         foldedAtEnd(F_unf) = begin
+            evo = EvoParams(40, 100, 1e-2, 1, 1.0, F_unf) # weak selection on binding
             Random.seed!(3)
             nets = [buildRandNetwork(tables) for _ in 1:evo.P]
-            _, _, F0Bucket = evolvePopStatic!(nets, ligands, tables, β, evo, Binding1();
-                                              sampleLastHalf=false, F_unfolded=F_unf)
-            mean(foldedFraction.(F0Bucket[:, end], F_unfolded, β))
+            _, _, F0Bucket = evolvePopStatic!(nets, ligands, tables, β, evo, Binding1(); sampleLastHalf=false)
+            mean(isFolded.(F0Bucket[:, end], F_unfolded))
         end
         @test foldedAtEnd(F_unfolded) > 0.9 # selection drives the population to fold
         @test foldedAtEnd(Inf) < 0.5 # without the threshold it does not
         # the default F_unfolded = Inf is exactly the evolution without unfolding
+        @test EvoParams(10, 64, 1e-2, 4, 50.0).F_unfolded == Inf
         @test evolvePop(ligands, tables, β, EvoParams(10, 64, 1e-2, 4, 50.0), UInt(1)) ==
-              evolvePop(ligands, tables, β, EvoParams(10, 64, 1e-2, 4, 50.0), UInt(1); F_unfolded=Inf)
+              evolvePop(ligands, tables, β, EvoParams(10, 64, 1e-2, 4, 50.0, Inf), UInt(1))
     end
 
     @testset "sampleLastHalf=false returns the final population" begin
