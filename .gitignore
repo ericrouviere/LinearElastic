@@ -1,3 +1,6 @@
+# Claude Code instructions, kept local
+CLAUDE.md
+
 # Experiments (scripts, ~4.4 GB of simulation output, analysis) and exploratory notebooks are kept out of git
 exps/
 notebooks/
