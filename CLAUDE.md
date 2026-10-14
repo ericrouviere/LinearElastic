@@ -228,7 +228,7 @@ pre-strain `e₀ = b'G'h` and compliance `χ = b'G'b`; keep the note in sync whe
 
 ## Key conventions
 - `exps/`, `notebooks/` and `Rigidpy/` (a clone of github.com/VardaHagh/Rigidpy, used by the unit-test notebook) are
-  git-ignored large/data directories. Only `src/`, `test/`, the package files, `README`, `CLAUDE.md` and `methods.md` are tracked.
+  git-ignored large/data directories. Only `src/`, `test/`, the package files, `README.md`, `CLAUDE.md` and `methods.md` are tracked.
 - `src/old/` contains deprecated code kept verbatim for reference (`<file>_old_funcs.jl`, and removed exports in
   `LinearElastic_old_exports.jl`); do not use or modify it.
 - `computeHessian`, `computePerturbedNetParams_old`, `pdetdiagm` and the matrix method of `logpdet` are kept only for
