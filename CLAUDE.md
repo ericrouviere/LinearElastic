@@ -20,10 +20,12 @@ using Revise
 using LinearElastic
 ```
 
-`tutorial.ipynb` (repo root, Julia 1.12 kernel, run from the repo root) walks through the model for a beginner: tables,
-ligands, a random sequence, its energy landscape and free energy, binding energies (checked against the closed form),
-mutations, a fluctuating-selection run, the conformational change and the mutational sensitivity. It is committed with
-its outputs; re-execute it with `jupyter nbconvert --to notebook --execute --inplace tutorial.ipynb` after API changes.
+`notebooks/tutorial.ipynb` (Julia 1.12 kernel, which finds the project with `--project=@.`) walks through the model for a
+beginner: the energy function, parameters, the network and interaction tables, a random sequence and its springs, the
+free energy, ligand binding and binding energies (checked against the closed form), the binding trade-off, mutations,
+the stability threshold, static-selection evolution, the conformational change and the mutational sensitivity. It is
+git-ignored with the rest of `notebooks/`; re-execute it with
+`jupyter nbconvert --to notebook --execute --inplace notebooks/tutorial.ipynb` after API changes.
 
 The environment is resolved for Julia 1.12 (installed via juliaup). Tests are standalone scripts in `test/`:
 
@@ -226,7 +228,7 @@ pre-strain `e₀ = b'G'h` and compliance `χ = b'G'b`; keep the note in sync whe
 
 ## Key conventions
 - `exps/`, `notebooks/` and `Rigidpy/` (a clone of github.com/VardaHagh/Rigidpy, used by the unit-test notebook) are
-  git-ignored large/data directories. Only `src/`, `test/`, the package files, `README`, `CLAUDE.md`, `methods.md` and `tutorial.ipynb` are tracked.
+  git-ignored large/data directories. Only `src/`, `test/`, the package files, `README`, `CLAUDE.md` and `methods.md` are tracked.
 - `src/old/` contains deprecated code kept verbatim for reference (`<file>_old_funcs.jl`, and removed exports in
   `LinearElastic_old_exports.jl`); do not use or modify it.
 - `computeHessian`, `computePerturbedNetParams_old`, `pdetdiagm` and the matrix method of `logpdet` are kept only for
